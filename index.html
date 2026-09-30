@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Outbreak case dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<style>
+:root{
+  --bg:#F2F5F4; --surface:#FFFFFF; --ink:#14252B; --ink-2:#3C4E54; --muted:#66777C;
+  --line:#D7DFDE; --line-2:#E8EEED;
+  --teal:#0E6F73; --teal-2:#0A5558; --teal-soft:#DCEDEC; --amber:#D08C1A; --amber-soft:#F6E8CC;
+  --red:#B8433A; --na:#B9C3C4;
+  --radius-lg:10px; --radius-sm:5px;
+  --font:"Public Sans", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:calc(env(safe-area-inset-top,0px) + 70px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;
+  font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+.wrap{max-width:1360px;margin:0 auto;padding:0 28px}
+
+/* Masthead */
+.mast{background:var(--surface);border-bottom:1px solid var(--line)}
+.mast .wrap{display:flex;align-items:center;gap:20px;padding-top:18px;padding-bottom:16px;flex-wrap:wrap}
+.mark{width:38px;height:38px;border-radius:9px;background:var(--teal);display:grid;place-items:center;flex:none}
+.mark svg{display:block}
+.titles{flex:1 1 380px;min-width:0}
+.title-input{border:0;background:transparent;font-size:24px;font-weight:800;letter-spacing:-.015em;width:100%;
+  padding:2px 6px;margin-left:-6px;border-radius:6px}
+.title-input:hover{background:var(--bg)}
+.meta{color:var(--muted);font-size:13px;padding-left:0}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:7px;padding:8px 14px;font-weight:600;font-size:13.5px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px}
+.btn:hover{border-color:var(--teal);color:var(--teal)}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}
+.btn.primary:hover{background:var(--teal-2);color:#fff}
+.btn.small{padding:5px 10px;font-size:12.5px}
+
+/* Empty state */
+.empty{padding:56px 0 80px}
+.drop{background:var(--surface);border:2px dashed #B7C8C6;border-radius:14px;padding:56px 32px;text-align:center;max-width:760px;margin:0 auto;transition:border-color .15s, background .15s}
+.drop.over{border-color:var(--teal);background:#F4FAF9}
+.drop h1{font-size:26px;margin:14px 0 6px;letter-spacing:-.015em}
+.drop p{color:var(--ink-2);max-width:56ch;margin:0 auto 20px}
+.drop .fine{font-size:13px;color:var(--muted);margin-top:18px}
+.err{color:var(--red);font-weight:600;margin-top:14px}
+
+/* Sections */
+main{padding:22px 0 60px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg)}
+.sec{margin-top:26px}
+.sec-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:0 0 12px}
+.sec-head h2{font-size:19px;margin:0;letter-spacing:-.01em}
+.sec-head .note{color:var(--muted);font-size:13px}
+.sec-head .spacer{flex:1}
+
+/* Mapping */
+details.mapping{padding:0}
+details.mapping summary{cursor:pointer;padding:12px 18px;font-weight:600;font-size:14px;list-style:none;display:flex;gap:10px;align-items:center}
+details.mapping summary::-webkit-details-marker{display:none}
+details.mapping summary .chev{transition:transform .15s}
+details.mapping[open] summary .chev{transform:rotate(90deg)}
+details.mapping summary .hint{font-weight:400;color:var(--muted);font-size:13px}
+.map-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px 18px;padding:4px 18px 16px}
+.map-grid label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:600}
+.map-grid select{border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:#fff;font-weight:400;font-size:13.5px;color:var(--ink)}
+.opts{display:flex;gap:22px;flex-wrap:wrap;padding:12px 18px 16px;border-top:1px solid var(--line-2);font-size:13.5px}
+.opts label{display:flex;gap:8px;align-items:center;cursor:pointer}
+.opts input{accent-color:var(--teal);width:16px;height:16px}
+
+/* Epicurve */
+.epi{padding:20px 22px 16px}
+.epi-top{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap}
+.epi-top h2{font-size:21px;margin:0;letter-spacing:-.012em}
+.epi-top .sub{color:var(--muted);font-size:13px;margin-top:2px}
+.epi-ctrl{margin-left:auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.epi-ctrl label{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.epi-ctrl select{border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:#fff;font-size:13.5px}
+.stats{display:flex;flex-wrap:wrap;margin:18px 0 6px;border-top:1px solid var(--line-2);border-bottom:1px solid var(--line-2)}
+.stat{padding:12px 22px 12px 0;margin-right:22px;border-right:1px solid var(--line-2);min-width:110px}
+.stat:last-child{border-right:0}
+.stat .v{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+.stat .v small{font-size:14px;font-weight:600;color:var(--muted);letter-spacing:0}
+.stat .k{font-size:12.5px;color:var(--muted);margin-top:3px}
+.stat.hero .v{font-size:40px;color:var(--teal)}
+.epi-canvas{position:relative;height:460px;margin-top:10px}
+.epi-foot{font-size:12.5px;color:var(--muted);margin-top:8px;display:flex;gap:16px;flex-wrap:wrap}
+
+/* Filter bar */
+.fbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;margin-top:26px;background:rgba(242,245,244,.94);backdrop-filter:blur(6px);
+  padding:10px 0;border-bottom:1px solid transparent}
+.fbar.stuck{border-bottom-color:var(--line)}
+.fbar-in{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.fbar .lbl{font-weight:700;font-size:13.5px;margin-right:4px}
+.fdrop{position:relative}
+.fdrop > button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:13px;cursor:pointer;display:flex;gap:6px;align-items:center}
+.fdrop > button .val{color:var(--muted)}
+.fdrop.active > button{background:var(--teal);border-color:var(--teal);color:#fff}
+.fdrop.active > button .val{color:#DDF1F0}
+.pop{position:absolute;top:calc(100% + 6px);left:0;min-width:260px;max-width:340px;background:#fff;border:1px solid var(--line);border-radius:9px;
+  box-shadow:0 10px 30px rgba(20,37,43,.14);padding:8px;display:none;z-index:40}
+.fdrop.open .pop{display:block}
+.pop input[type=search]{width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px;margin-bottom:6px}
+.pop .list{max-height:280px;overflow:auto}
+.pop .opt{display:flex;gap:8px;align-items:center;padding:5px 6px;border-radius:5px;font-size:13px;cursor:pointer}
+.pop .opt:hover{background:var(--bg)}
+.pop .opt input{accent-color:var(--teal)}
+.pop .opt .n{margin-left:auto;color:var(--muted);font-size:12px}
+.pop .opt.zero{opacity:.45}
+.pop .pf{display:flex;justify-content:space-between;border-top:1px solid var(--line-2);margin-top:6px;padding-top:6px}
+.pop .pf button{border:0;background:none;color:var(--teal);font-weight:600;font-size:12.5px;cursor:pointer;padding:3px 4px}
+.fcount{margin-left:auto;font-size:13px;color:var(--ink-2)}
+.fcount b{color:var(--teal)}
+.linkbtn{border:0;background:none;color:var(--teal);font-weight:600;font-size:13px;cursor:pointer;padding:4px 6px}
+.linkbtn[disabled]{color:var(--na);cursor:default}
+
+/* Grids */
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.card{padding:16px 18px 14px;min-width:0}
+.card h3{font-size:15px;margin:0 0 2px}
+.card .cn{font-size:12.5px;color:var(--muted);margin-bottom:10px}
+.s4{grid-column:span 4}.s5{grid-column:span 5}.s6{grid-column:span 6}.s7{grid-column:span 7}.s8{grid-column:span 8}.s12{grid-column:span 12}
+.ch{position:relative;height:300px}
+.ch.tall{height:420px}
+.card.fill{display:flex;flex-direction:column}
+.card.fill .ch.grow{flex:1 1 auto;height:auto;min-height:420px}
+.clickhint{font-size:12px;color:var(--muted)}
+
+/* proportion bars */
+.pbar-wrap{margin-bottom:16px}
+.pbar-wrap .pt{display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:6px}
+.pbar{display:flex;height:34px;border-radius:6px;overflow:hidden;background:var(--line-2)}
+.pbar .seg{display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700;min-width:2px;cursor:pointer;border:0;padding:0;white-space:nowrap;overflow:hidden}
+.pbar .seg.muted{opacity:.3}
+.pleg{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px;font-size:12.5px;color:var(--ink-2)}
+.pleg span{display:inline-flex;align-items:center;gap:6px}
+.pleg i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.agebox{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--line-2);border-radius:8px;margin-bottom:18px}
+.agebox div{padding:10px 12px;border-right:1px solid var(--line-2)}
+.agebox div:last-child{border-right:0}
+.agebox b{display:block;font-size:20px;letter-spacing:-.01em}
+.agebox span{font-size:12px;color:var(--muted)}
+
+/* Age group table */
+.agetbl-wrap .pt{display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:4px}
+.agetbl-wrap .pt{align-items:center;gap:10px}
+.agetbl-wrap select{border:1px solid var(--line);border-radius:6px;padding:4px 6px;background:#fff;font-size:12.5px;font-weight:500;max-width:62%}
+table.agetbl{width:100%;border-collapse:collapse;font-size:13px}
+table.agetbl th{font-size:11.5px;color:var(--muted);font-weight:600;text-align:right;padding:4px 6px;border-bottom:1px solid var(--line-2)}
+table.agetbl th:first-child{text-align:left}
+table.agetbl td{padding:4px 6px;border-bottom:1px solid var(--line-2)}
+table.agetbl tr.row{cursor:pointer}
+table.agetbl tr.row:hover td{background:#F4F8F7}
+table.agetbl tr.muted td{opacity:.38}
+table.agetbl td.g{font-weight:600;white-space:nowrap;width:1%}
+table.agetbl td.b{width:100%}
+table.agetbl td.b span{display:block;height:9px;border-radius:2px;min-width:1px}
+table.agetbl td.n,table.agetbl td.p{text-align:right;white-space:nowrap;font-weight:700}
+table.agetbl td.p{color:var(--ink-2);font-weight:500}
+table.agetbl tr.tot td{font-weight:800;border-bottom:0;border-top:1px solid var(--line)}
+table.agetbl tr.na td.g{color:var(--muted)}
+
+/* Facility type list */
+.ftype{list-style:none;margin:0;padding:0}
+.ftype li{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:9px 0;border-bottom:1px solid var(--line-2);cursor:pointer}
+.ftype li:last-child{border-bottom:0}
+.ftype li.muted{opacity:.4}
+.ftype .nm{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:8px}
+.ftype .nm i{width:10px;height:10px;border-radius:2px}
+.ftype .ct{font-size:13.5px;font-weight:700}
+.ftype .ct small{color:var(--muted);font-weight:500;margin-left:4px}
+.ftype .tr{grid-column:1/-1;height:6px;background:var(--line-2);border-radius:3px;overflow:hidden}
+.ftype .tr b{display:block;height:100%}
+
+/* Heatmap */
+.hm-wrap{overflow-x:auto;border-top:1px solid var(--line-2);margin-top:6px}
+table.hm{border-collapse:separate;border-spacing:2px;font-size:12px;min-width:100%}
+table.hm th{font-weight:600;color:var(--muted);padding:4px 3px;white-space:nowrap;background:#fff}
+table.hm thead th.d{writing-mode:vertical-rl;transform:rotate(180deg);height:62px;font-size:11px;vertical-align:bottom;text-align:left}
+table.hm td.c{width:26px;min-width:26px;height:26px;text-align:center;border-radius:3px;font-weight:700;font-size:11px}
+table.hm td.fac{position:sticky;left:0;background:#fff;padding:3px 12px 3px 2px;white-space:nowrap;font-weight:600;font-size:12.5px;color:var(--ink);max-width:280px;overflow:hidden;text-overflow:ellipsis;z-index:1}
+table.hm th.fac{position:sticky;left:0;z-index:2;text-align:left}
+table.hm td.tot{font-weight:800;text-align:right;padding-right:10px;font-size:13px}
+table.hm td.nd{color:var(--muted);text-align:center}
+.tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:4px;background:var(--line-2);color:var(--ink-2);margin-left:6px;vertical-align:1px}
+
+/* Quality */
+details.dq summary{cursor:pointer;padding:14px 18px;font-weight:700;list-style:none;display:flex;gap:10px;align-items:center}
+details.dq summary::-webkit-details-marker{display:none}
+details.dq summary .chev{transition:transform .15s}
+details.dq[open] summary .chev{transform:rotate(90deg)}
+details.dq summary .hint{font-weight:400;color:var(--muted);font-size:13px}
+.dq-body{padding:0 18px 18px;display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.dq-body h4{margin:6px 0 8px;font-size:13.5px}
+table.simple{border-collapse:collapse;width:100%;font-size:13px}
+table.simple td,table.simple th{padding:6px 8px;border-bottom:1px solid var(--line-2);text-align:left;vertical-align:top}
+table.simple th{color:var(--muted);font-weight:600;font-size:12px}
+table.simple td.r,table.simple th.r{text-align:right}
+.dq-scroll{max-height:300px;overflow:auto}
+.foot{color:var(--muted);font-size:12.5px;margin-top:28px;max-width:90ch}
+
+@media (max-width:980px){
+  .s4,.s5,.s6,.s7,.s8{grid-column:span 12}
+  .dq-body{grid-template-columns:1fr}
+  .epi-canvas{height:380px}
+}
+@media (max-width:600px){
+  .wrap{padding:0 14px}
+  .stat{min-width:0;padding-right:14px;margin-right:14px}
+  .stat .v{font-size:21px}.stat.hero .v{font-size:30px}
+  .epi{padding:16px 14px}
+  .epi-canvas{height:320px}
+  .fcount{margin-left:0;width:100%}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap">
+    <div class="mark" aria-hidden="true">
+      <svg width="22" height="22" viewBox="0 0 22 22"><rect x="2" y="13" width="3" height="7" fill="#fff" opacity=".6"/><rect x="6" y="8" width="3" height="12" fill="#fff" opacity=".8"/><rect x="10" y="3" width="3" height="17" fill="#fff"/><rect x="14" y="9" width="3" height="11" fill="#fff" opacity=".8"/><rect x="18" y="15" width="2.5" height="5" fill="#fff" opacity=".6"/></svg>
+    </div>
+    <div class="titles">
+      <input class="title-input" id="title" value="Outbreak case dashboard" aria-label="Dashboard title (editable)">
+      <div class="meta" id="meta">Upload a line list to begin</div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btnExport" hidden>Export cleaned data</button>
+      <button class="btn primary" id="btnUpload">Upload file</button>
+    </div>
+    <input type="file" id="file" accept=".xlsx,.xls,.xlsm,.csv" hidden>
+  </div>
+</header>
+
+<section class="empty wrap" id="empty">
+  <div class="drop" id="drop">
+    <svg width="54" height="54" viewBox="0 0 54 54" aria-hidden="true"><rect x="1" y="1" width="52" height="52" rx="12" fill="#DCEDEC"/><rect x="12" y="32" width="5" height="10" fill="#0E6F73" opacity=".55"/><rect x="19" y="22" width="5" height="20" fill="#0E6F73" opacity=".8"/><rect x="26" y="13" width="5" height="29" fill="#0E6F73"/><rect x="33" y="24" width="5" height="18" fill="#0E6F73" opacity=".8"/><rect x="40" y="34" width="4" height="8" fill="#0E6F73" opacity=".55"/></svg>
+    <h1>Drop your case line list here</h1>
+    <p>Excel or CSV, one row per case. The dashboard finds the date, age, gender, ethnicity, nationality, address and facility columns on its own, and you can adjust them after loading.</p>
+    <button class="btn primary" id="btnUpload2">Choose file</button>
+    <div class="fine">The file is read in your browser and is never uploaded anywhere. Names, IC and phone numbers are used only to spot duplicate entries and are never displayed.</div>
+    <div class="err" id="err" hidden></div>
+  </div>
+</section>
+
+<main class="wrap" id="app" hidden>
+
+  <details class="panel mapping" id="mapping">
+    <summary><span class="chev">▸</span> Columns and cleaning options <span class="hint" id="mapHint"></span></summary>
+    <div class="map-grid" id="mapGrid"></div>
+    <div class="opts">
+      <label><input type="checkbox" id="optDedup" checked> Merge repeated entries of the same person</label>
+      <label><input type="checkbox" id="optHarm" checked> Harmonise locality spellings</label>
+      <label><input type="checkbox" id="optOut"> Include dates far outside the outbreak window</label>
+    </div>
+  </details>
+
+  <section class="panel epi sec" aria-labelledby="epiTitle">
+    <div class="epi-top">
+      <div>
+        <h2 id="epiTitle">Epidemic curve</h2>
+        <div class="sub" id="epiSub"></div>
+      </div>
+      <div class="epi-ctrl">
+        <label>Colour bars by
+          <select id="stackBy">
+            <option value="none">Nothing (total)</option>
+            <option value="gender">Gender</option>
+            <option value="ageGroup">Age group</option>
+            <option value="eth">Ethnicity</option>
+            <option value="nat">Nationality</option>
+            <option value="facType">Facility type</option>
+            <option value="fac">Reporting facility</option>
+            <option value="loc">Locality</option>
+          </select>
+        </label>
+        <button class="btn small" id="btnPng">Save as PNG</button>
+      </div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="epi-canvas"><canvas id="cEpi" aria-label="Daily epidemic curve"></canvas></div>
+    <div class="epi-foot" id="epiFoot"></div>
+  </section>
+
+  <div class="fbar" id="fbar">
+    <div class="fbar-in" id="fbarIn">
+      <span class="lbl">Filter cases</span>
+      <div id="fdrops" style="display:contents"></div>
+      <button class="linkbtn" id="btnReset" disabled>Clear filters</button>
+      <span class="fcount" id="fcount"></span>
+    </div>
+  </div>
+
+  <section class="sec" aria-labelledby="sdTitle">
+    <div class="sec-head">
+      <h2 id="sdTitle">Who is affected</h2>
+      <span class="note">Click any bar or segment to filter by it. Filters apply to the whole dashboard.</span>
+    </div>
+    <div class="grid">
+      <div class="panel card s7 fill">
+        <h3>Age and gender</h3>
+        <div class="cn" id="pyrNote"></div>
+        <div class="ch tall grow"><canvas id="cPyr"></canvas></div>
+      </div>
+      <div class="panel card s5">
+        <h3>Age</h3>
+        <div class="cn">Years, among cases with a recorded age</div>
+        <div class="agebox" id="ageBox"></div>
+        <div class="pbar-wrap" id="pGender"></div>
+        <div class="pbar-wrap" id="pNat"></div>
+        <div class="agetbl-wrap">
+          <div class="pt"><span>Cases by age group</span>
+            <select id="ageScheme" aria-label="Age grouping"><option value="standard">Standard bands</option><option value="custom">Under 5 / 5–17 / 18–29 / 30–60 / over 60</option></select></div>
+          <table class="agetbl" id="ageTbl"></table>
+        </div>
+      </div>
+      <div class="panel card s5">
+        <h3>Ethnicity</h3>
+        <div class="cn" id="ethNote"></div>
+        <div class="ch tall"><canvas id="cEth"></canvas></div>
+      </div>
+      <div class="panel card s7">
+        <h3>Locality</h3>
+        <div class="cn" id="locNote"></div>
+        <div class="ch tall"><canvas id="cLoc"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="facTitle">
+    <div class="sec-head">
+      <h2 id="facTitle">Reporting facilities</h2>
+      <span class="note" id="facNote"></span>
+    </div>
+    <div class="grid">
+      <div class="panel card s8">
+        <h3>Cases by facility</h3>
+        <div class="cn">Where cases sought treatment, as entered in the line list</div>
+        <div class="ch tall"><canvas id="cFac"></canvas></div>
+      </div>
+      <div class="panel card s4">
+        <h3>Facility type</h3>
+        <div class="cn">Grouped from the facility name</div>
+        <ul class="ftype" id="fType"></ul>
+      </div>
+      <div class="panel card s12">
+        <h3>Cases by facility and day</h3>
+        <div class="cn">Each cell is the number of cases that facility saw that day. Useful for spotting which facility picked up cases first.</div>
+        <div class="hm-wrap"><table class="hm" id="hm"></table></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <details class="panel dq" id="dq">
+      <summary><span class="chev">▸</span> Data quality <span class="hint" id="dqHint"></span></summary>
+      <div class="dq-body" id="dqBody"></div>
+    </details>
+  </section>
+
+  <p class="foot">Standard age groups follow 5-year bands up to 29, then 10-year bands; the alternative grouping (chosen in the Age card) applies everywhere, and “30–60” includes 60-year-olds. Facility type is assigned by keywords in the facility name (hospital, emergency, ETD, KK or Klinik Kesihatan for public clinics, other klinik names as private clinics, farmasi, and so on); free-text answers that are not a facility are grouped as “No facility visit” or “Other or unclear”.</p>
+</main>
+
+<script id="embedded-data" type="application/json">{"fileName":"AGE_30.xlsx","sheet":"Sheet1","title":"Acute gastroenteritis cases","note":"Data embedded 30 Sep 2026; house and lot numbers removed from addresses.","headers":["Tahun","Bulan","Jantina","Bangsa","Warganegara","Alamat","Fasiliti","Tarikh mendapatkan rawatan (sekiranya ada)"],"rows":[["25",null,"PEREMPUAN","Bugis","Warganegara","Kg Airport Lama","Klinik Mabello Helmina","2026-09-25"],[null,"11","LELAKI","Bugis","Warganegara","Tg Batu Darat","Klinik Mabello Helmina","2026-09-26"],["8",null,"PEREMPUAN","Banjar","Warganegara","Taman Muhibbah Jaya","KLINIK MABELLO HELMINA","2026-09-26"],["2",null,"LELAKI","Cocos","Warganegara","TG BATU LAUT","KLINIK MABELLO HELMINA","2026-09-26"],["27",null,"PEREMPUAN","Cocos ","Warganegara","TG BATU LAUT","KLINIK MABELLO HELMINA","2026-09-26"],["14",null,"PEREMPUAN","Bajau","Warganegara","FELDA UMAS","KLINIK MABELLO HELMINA","2026-09-26"],["23",null,"PEREMPUAN","Bajau","Warganegara","FELDA UMAS","KLINIK MABELLO HELMINA ","2026-09-27"],["10",null,"LELAKI","Bugis","Warganegara","JALAN DAMAI","KLINIK MABELLO HELMINA ","2026-09-27"],["5",null,"PEREMPUAN","Bugis","Warganegara","KG JAWA JALAN MADU","KLINIK MABELLO HELMINA ","2026-09-27"],["12",null,"LELAKI","Brunei","Warganegara","BLOK E-1 JALAN KUHARA","KLINIK MABELLO HELMINA ","2026-09-27"],["24",null,"PEREMPUAN","Melayu","Warganegara","RICH PARK","KLINIK BUTIZA","2026-09-25"],["17",null,"PEREMPUAN","Tidung","Warganegara","PPR TAMAN SRI TITINGAN BLOK A","KLINIK BUTIZA ","2026-09-25"],["22",null,"LELAKI","Toraja","Bukan Warganegara","Hilltop","KLINIK BUTIZA ","2026-09-25"],["57",null,"PEREMPUAN","Bugis","Bukan Warganegara","KG JAWA","Klinik Butiza","2026-09-25"],["66",null,"LELAKI","COCOS","Warganegara","KG BALUNG COCOS","PUTRAMED CLINICS BALUNG","2026-09-26"],["41",null,"LELAKI","Tidung","Warganegara","KG AIRPORT LAMA","KLINIK BUTIZA ","2026-09-25"],["20",null,"PEREMPUAN","COCOS","Warganegara","KG BALUNG COCOS","PUTRAMED CLINICS BALUNG","2026-09-26"],["19",null,"PEREMPUAN","MELAYU","Warganegara","KAMPUS IPG","PUTRAMED CLINICS BALUNG","2026-09-26"],["26",null,"LELAKI","Tidung","Warganegara","TAMAN SEMARAK","KLINIK BUTIZA ","2026-09-25"],["25",null,"PEREMPUAN","BUGIS","Warganegara","KG RANCANGAN, BATU 22","PUTRAMED CLINICS BALUNG","2026-09-26"],["1",null,"PEREMPUAN","BUGIS","Warganegara","KG RANCANGAN, BATU 22","PUTRAMED CLINICS BALUNG","2026-09-26"],["8",null,"LELAKI","BAJAU","Warganegara","KG BALUNG COCOS","PUTRAMED CLINICS BALUNG","2026-09-26"],["2",null,"PEREMPUAN","BUGIS","Warganegara","SG BALUNG","PUTRAMED CLINICS BALUNG","2026-09-27"],["19",null,"LELAKI","BAJAU","Warganegara","KAMPUS IPG","PUTRAMED CLINICS BALUNG","2026-09-27"],["22",null,"PEREMPUAN","BUGIS","Warganegara","KG BUKIT QUION","PUTRAMED CLINICS BALUNG","2026-09-27"],["37",null,"PEREMPUAN","SUNGAI","Warganegara","PJ INDERA","PUTRAMED CLINICS BALUNG","2026-09-27"],["23",null,"PEREMPUAN","MELAYU","Warganegara","KG INDERASABAH","PUTRAMED CLINICS BALUNG","2026-09-27"],["44",null,"PEREMPUAN","JAWA","Warganegara","TAMAN SAWIT","PUTRAMED CLINICS BALUNG","2026-09-27"],["31",null,"PEREMPUAN","NIL","Warganegara","BATU 2 JALAN APAS TAWAU","MEDISINAR KLINIK & SURGERI SEMARAK","2026-09-25"],["7",null,"LELAKI","NIL","Warganegara","TAMAN SEMARAK","MEDISINAR KLINIK & SURGERI SEMARAK","2026-09-25"],["42",null,"PEREMPUAN","Arab","Warganegara","TAMAN BUNGA TULIP","KLINIK BUTIZA ","2026-09-26"],["32",null,"LELAKI","NIL","Warganegara","TAMAN SEMARAK","MEDISINAR KLINIK & SURGERI SEMARAK","2026-09-26"],["22",null,"LELAKI","Toraja","Bukan Warganegara","TG BATU","Klinik Butiza ","2026-09-26"],["16",null,"LELAKI","NIL","Warganegara","TAMAN SEMARAK","MEDISINAR KLINIK & SURGERI SEMARAK","2026-09-26"],["66",null,"PEREMPUAN","Melayu","Warganegara","KG AIRPORT LAMA JALAN OKK ABU BAKAR","KLINIK BUTIZA ","2026-09-26"],["10",null,"LELAKI","NIL","Warganegara","PASIR PUTIH","MEDISINAR KLINIK & SURGERI SEMARAK","2026-09-26"],["60",null,"PEREMPUAN","Bugis","Warganegara","KG TG BATU LAUT","KLINIK BUTIZA ","2026-09-26"],["39",null,"LELAKI","Bugis","Bukan Warganegara","KG TG BATU LAUT","KLINIK BUTIZA ","2026-09-26"],["28",null,"PEREMPUAN","Bugis","Warganegara","KG TG BATU LAUT","KLINIK BUTIZA ","2026-09-26"],["17",null,"PEREMPUAN","NIL","Warganegara","TAMAN SEMARAK","MEDISINAR KLINIK & SURGERI SEMARAK","2026-09-26"],["35",null,"PEREMPUAN","NIL","Warganegara","TAMAN SEMARAK","MEDISINAR KLINIK & SURGERI SEMARAK","2026-09-26"],["23",null,"LELAKI","-","Warganegara","BLOK BAJANG KD SRI TAWAU","KLINIK BUTIZA ","2026-09-26"],["55",null,"PEREMPUAN","NIL","Warganegara","KG TANJUNG BATU DARAT","MEDISINAR KLINIK & SURGERI SEMARAK","2026-09-26"],["1",null,"LELAKI","Bugis ","Warganegara","KG TG BATU LAUT","KLINIK BUTIZA ","2026-09-26"],["37",null,"LELAKI","NIL","Warganegara","TAMAN SEMARAK","MEDISINAR KLINIK & SURGERI SEMARAK","2026-09-27"],["29",null,"PEREMPUAN","Bugis","Warganegara","RUMAH PANGSA KINARUT","KLINIK BUTIZA ","2026-09-26"],["30",null,"PEREMPUAN","NIL","Warganegara","TAMAN SEMARAK","MEDISINAR KLINIK & SURGERI SEMARAK","2026-09-27"],["32",null,"PEREMPUAN","NIL","Warganegara","KG PUKAT TANJUNG BATU DARAT","MEDISINAR KLINIK & SURGERI SEMARAK","2026-09-27"],["15",null,"LELAKI","Bugis","Warganegara","KG PUKAT TG BATU LAUT","KLINIK BUTIZA ","2026-09-26"],["33",null,"PEREMPUAN","NIL","Warganegara","KG MEROTAI BESAR","MEDISINAR KLINIK & SURGERI SEMARAK","2026-09-27"],["25",null,"LELAKI","Suluk","Warganegara","Blok 31 Batu 16","KLINIK BUTIZA ","2026-09-26"],["14",null,"LELAKI","NIL","Warganegara","TAMAN SEMARAK","MEDISINAR KLINIK & SURGERI SEMARAK","2026-09-27"],["42",null,"LELAKI","Melayu","Warganegara","KUARTERS MARIN CEMPALA","KLINIK BUTIZA ","2026-09-26"],["2",null,"PEREMPUAN","Indonesia ","Bukan Warganegara","BATU 2 JLN APAS LORONG HABIB ABD RAHMAN","KLINIK BUTIZA ","2026-09-26"],["47",null,"PEREMPUAN","CINA","Warganegara","KAMPUNG TINAGAT","PUTRAMED PERDANA SQUARE ","2026-09-25"],["8",null,"LELAKI","Bugis","Warganegara","KG MEROTAI BESAR","KLINIK BUTIZA ","2026-09-26"],["22",null,"LELAKI","NIL","Warganegara","TAMAN BINTANG","PUTRAMED PERDANA SQUARE ","2026-09-25"],["21",null,"LELAKI","Melayu","Warganegara","KD SRI TAWAU","KLINIK BUTIZA ","2026-09-26"],["4",null,"LELAKI","NIL","Warganegara","KG RAWA-RAWA","PUTRAMED PERDANA SQUARE ","2026-09-25"],["17",null,"LELAKI","NIL","Warganegara","BANDAR SRI INDAH","PUTRAMED PERDANA SQUARE ","2026-09-26"],["22",null,"LELAKI","Melayu","Warganegara","KD SRI TAWAU","KLINIK BUTIZA ","2026-09-27"],["49",null,"PEREMPUAN","NIL","Warganegara","TAMAN BDC","PUTRAMED PERDANA SQUARE ","2026-09-26"],["25",null,"PEREMPUAN","Cina","Warganegara","KG TG BATU LAUT","KLINIK BUTIZA ","2026-09-27"],["2",null,"LELAKI","NIL","Warganegara","BATU 2 1/2 JALAN APAS","PUTRAMED PERDANA SQUARE ","2026-09-26"],["61",null,"PEREMPUAN","Jawa","Bukan Warganegara","JALAN DAMAI BATU 1 LRG HAJI MARZUKI","Klinik Butiza ","2026-09-27"],["45",null,"LELAKI","NIL","Warganegara","TAMAN VILLA 3 1/2","PUTRAMED PERDANA SQUARE ","2026-09-26"],["28",null,"LELAKI","NIL","Warganegara","KAMPUNG JAWA","PUTRAMED PERDANA SQUARE ","2026-09-27"],["22",null,"PEREMPUAN","Bugis","Warganegara","TG BATU","KLINIK BUTIZA ","2026-09-27"],["58",null,"PEREMPUAN","CINA","Warganegara","TAMAN BINTANG","PUTRAMED PERDANA SQUARE ","2026-09-27"],["3",null,"LELAKI","Bugis","Bukan Warganegara","NUNUKAN INDONESIA","KLINIK BUTIZA ","2026-09-27"],["48",null,"PEREMPUAN","CINA","Warganegara","TAMAN MEGAH JAYA","PUTRAMED PERDANA SQUARE ","2026-09-27"],["44",null,"LELAKI","CINA","Warganegara","TAMAN BDC","PUTRAMED PERDANA SQUARE ","2026-09-27"],["7",null,"LELAKI","Tidung","Warganegara","BANDAR SRI INDAH","KLINIK BUTIZA ","2026-09-27"],["74",null,"PEREMPUAN","NIL","Warganegara","KG AIR PANAS","PUTRAMED PERDANA SQUARE ","2026-09-27"],["7",null,"LELAKI","Bajau","Warganegara","Batu 9","KLINIK BUTIZA ","2026-09-27"],["16",null,"PEREMPUAN","NIL","Warganegara","TAMAN SEMARAK","PUTRAMED PERDANA SQUARE ","2026-09-27"],["18",null,"PEREMPUAN","Cina","Warganegara","AMBAR PARK","KLINIK BUTIZA ","2026-09-27"],["12",null,"LELAKI","NIL","Warganegara","KAMPUNG TINAGAT","PUTRAMED PERDANA SQUARE ","2026-09-27"],["38",null,"PEREMPUAN","NIL","Warganegara","JALAN APAS","PUTRAMED PERDANA SQUARE ","2026-09-27"],["34",null,"LELAKI","Melayu","Warganegara","KD SRI TAWAU","KLINIK BUTIZA ","2026-09-27"],["31",null,"PEREMPUAN","NIL","Warganegara","KG TINAGAT BATU 7","PUTRAMED PERDANA SQUARE ","2026-09-27"],["2",null,"LELAKI","Tidung","Warganegara","PRIMA RANGGU","KLINIK BUTIZA ","2026-09-27"],["5",null,"PEREMPUAN","CINA","Warganegara","TAMAN KINABUTAN","PUTRAMED PERDANA SQUARE ","2026-09-27"],["3",null,"PEREMPUAN","Melayu","Warganegara","KG BATU PUTIH SANDAKAN","KLINIK BUTIZA ","2026-09-27"],["45",null,"PEREMPUAN","NIL","Warganegara","BLOCK C TAKADA","PUTRAMED PERDANA SQUARE ","2026-09-27"],["3",null,"LELAKI","-","Warganegara","BLOK F SABINDO 4 JLN HABIB SHEIKH","KLINIK BUTIZA ","2026-09-27"],["12",null,"LELAKI","NIL","Warganegara","JALAN BUNGA RAYA","PUTRAMED PERDANA SQUARE ","2026-09-27"],["33",null,"PEREMPUAN","NIL","Warganegara","NIL","PUTRAMED PERDANA SQUARE ","2026-09-27"],["12",null,"LELAKI","NIL","Warganegara","BATU 2 JALAN APAS","PUTRAMED PERDANA SQUARE ","2026-09-27"],["51",null,"LELAKI","NIL","Warganegara","TAMAN BERJAYA","PUTRAMED PERDANA SQUARE ","2026-09-27"],["49",null,"LELAKI","NIL","Warganegara","TAMAN TAWAU LAMA","PUTRAMED PERDANA SQUARE ","2026-09-27"],["17",null,"LELAKI","NIL","Warganegara","TAMAN MEGAH JAYA","PUTRAMED PERDANA SQUARE ","2026-09-27"],["38",null,"LELAKI","CINA","Warganegara","TAMAN LCN","PUTRAMED PERDANA SQUARE ","2026-09-27"],["2",null,"LELAKI","NIL","Warganegara","KAMPUNG TANJUNG BATU DARAT TAWAU SABAH","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["29",null,"LELAKI","CINA","Warganegara","LORONG RIA 3 TAMAN RIA 1 KOTA KINABALU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-25"],["9",null,"LELAKI","NIL","Warganegara","KG TERAYUNG TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["4",null,"PEREMPUAN","NIL","Warganegara","NIL","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-26"],["3",null,"LELAKI","NIL","Warganegara","KG TITINGAN TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["33",null,"PEREMPUAN","NIL","Warganegara","KAMPUNG TINOSA 2 TENTERA SANDAKAN","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["20",null,"PEREMPUAN","NIL","Bukan Warganegara","BANDAR SRI INDAH TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-26"],["7",null,"PEREMPUAN","NIL","Warganegara","LORONG 3 TAWAU SABAH","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["14",null,"LELAKI","NIL","Warganegara","KUARTERS SESB TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["43",null,"PEREMPUAN","CINA","Warganegara","TAMAN FOK ON TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["31",null,"PEREMPUAN","NIL","Warganegara","BORENOS TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-25"],["30",null,"PEREMPUAN","CINA","Warganegara","TAMAN JEN TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-25"],["11",null,"LELAKI","NIL","Warganegara","KG RANGGU TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["8",null,"LELAKI","NIL","Warganegara","KG RANGGU TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["22",null,"PEREMPUAN","NIL","Bukan Warganegara","TAMAN LILY TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-25"],["15",null,"PEREMPUAN","NIL","Warganegara","RANGGU TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["21",null,"PEREMPUAN","NIL","Warganegara","KG TINAGAT BATU 8 1/2 TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-25"],["4",null,"PEREMPUAN","NIL","Warganegara","NIL","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-26"],["34",null,"LELAKI","CINA","Warganegara","TAMAN SETIA TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-25"],["33",null,"LELAKI","NIL","Warganegara","TAMAN SETIA","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-26"],["13",null,"PEREMPUAN","CINA","Warganegara","TAMAN SHAMROCK TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["7",null,"PEREMPUAN","NIL","Warganegara","TAMAN KUNAK KAYA","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["14",null,"LELAKI","NIL","Warganegara","TAMAN RIA HEIGHT TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["17",null,"PEREMPUAN","CINA","Warganegara","LORONG METEOR 2 TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["28",null,"LELAKI","NIL","Warganegara","KAMPUNG RANGGU BATU 10 TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["25",null,"LELAKI","NIL","Warganegara","TAMAN DA HUA 3","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["5",null,"LELAKI","NIL","Warganegara","KEM ASKAR KUBOTA","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["25",null,"PEREMPUAN","NIL","Warganegara","BSI TAWAU","MEDISINAR KLINIK & SURGERI TAWAU","2026-09-27"],["23",null,"LELAKI","NIL","Bukan Warganegara","TAMAN MEGAH JAYA","MEDISINAR KLINIK & SURGERI","2026-09-27"],["23",null,"PEREMPUAN",null,"Warganegara","KG KURNIA JAYA","ETD","2026-09-25"],["27",null,"PEREMPUAN",null,"Warganegara","KG BAKAU LRG UTARA","ETD","2026-09-25"],["26",null,"PEREMPUAN",null,"Warganegara","CONDO WING ONN FAJAR","ETD","2026-09-25"],["10",null,"LELAKI",null,"Warganegara","BATU PAYUNG","ETD","2026-09-26"],["25",null,"PEREMPUAN",null,"Warganegara","KG TITINGAN","ETD","2026-09-26"],["24",null,"PEREMPUAN",null,"Warganegara","TAMAN SRI TITINGAN","ETD","2026-09-26"],["30",null,"PEREMPUAN",null,"Warganegara","TAMAN RANGGU BATU 10","ETD","2026-09-26"],["20",null,"PEREMPUAN",null,"Warganegara","TAMAN TAWAU LAMA","ETD","2026-09-26"],[null,"9","LELAKI",null,"Warganegara","KG SRI MENANTI","ETD","2026-09-26"],["33",null,"PEREMPUAN",null,"Warganegara","KG TG BATU TENGAH","ETD","2026-09-26"],["34",null,"LELAKI",null,"Warganegara","KEM KABOTA TAWAU","ETD","2026-09-26"],["28",null,"PEREMPUAN",null,"Warganegara","JAMBATAN TENGKU OSMAN","ETD","2026-09-26"],["1",null,"LELAKI",null,"Warganegara","KG TITINGAN","ETD","2026-09-26"],["22",null,"PEREMPUAN",null,"Warganegara","TAMAN SRI APAS","ETD","2026-09-27"],[null,null,"PEREMPUAN",null,"Warganegara","RANGGU","ETD","2026-09-27"],[null,null,"LELAKI",null,"Warganegara","TAMAN RIA HEIGHT","ETD","2026-09-27"],[null,null,"LELAKI","BAJAU","Warganegara","TAMAN SEMARAK FASA 2A/1","MAT 3","2026-09-27"],["6",null,"LELAKI","BUGIS","Warganegara","KAMPUNG JAWA","KLINIK HOTSPRING","2026-09-27"],["42",null,"LELAKI","CINA","Warganegara","TAMAN JOO HWA","KLINIK HOTSPRING","2026-09-27"],["44",null,"LELAKI","CINA","Warganegara","TAMAN BINA BT 4","KLINIK HOTSPRING","2026-09-27"],["15",null,"LELAKI",null,"Warganegara","TAMAN BINA BT 4","KLINIK HOTSPRING","2026-09-27"],["47",null,"LELAKI","CINA","Warganegara","TAMAN BDC","KLINIK HOTSPRING","2026-09-27"],["15",null,"PEREMPUAN","MELAYU","Warganegara","TAMAN RIA 1","KLINIK HOTSPRING","2026-09-27"],["63",null,"LELAKI","CINA","Warganegara","TAMAN KING FOOK","KLINIK HOTSPRING","2026-09-27"],["16",null,"LELAKI","CINA","Warganegara",null,"KLINIK HOTSPRING","2026-09-27"],["18",null,"LELAKI","CINA","Warganegara","TAMAN MARRY","KLINIK HOTSPRING","2026-09-27"],["15",null,"LELAKI","CINA","Warganegara","TAMAN THIEN VUN","KLINIK HOTSPRING","2026-09-27"],["18",null,"PEREMPUAN",null,"Warganegara","KG MUHIBBAH","KLINIK PERMAI BALUNG","2026-09-27"],["19",null,"PEREMPUAN","KADAZAN","Warganegara","TAMAN SAWIT LORONG 5/5","KLINIK PERMAI BALUNG","2026-09-27"],["1",null,"PEREMPUAN","BUGIS","Warganegara","RANGGU BATU 5","TSMC","2026-09-27"],["3",null,"LELAKI","BUGIS","Warganegara","KAMPUNG MEROTAI","TSMC","2026-09-27"],[null,null,"LELAKI","CINA","Warganegara","TAMAN LAI LAI JALAN SIN ONN","TSMC","2026-09-27"],[null,null,"PEREMPUAN",null,"Warganegara","KAMPUS IPG TAWAU","ETD","2026-09-27"],[null,null,"PEREMPUAN",null,"Warganegara","KG PASIR PUTIH","ETD","2026-09-27"],[null,null,"LELAKI",null,"Warganegara","MEROTAI BESAR","ETD","2026-09-27"],[null,null,"PEREMPUAN",null,"Warganegara","BATU 6","ETD","2026-09-27"],[null,null,"PEREMPUAN",null,"Warganegara","BATU 4 JALAN AIR PANAS","MAT 3","2026-09-27"],[null,null,"PEREMPUAN",null,"Warganegara","KG TANJUNG BATU KERAMAT","MAT 3","2026-09-27"],[null,null,"PEREMPUAN",null,"Warganegara","PLAT MPT BLOK B","MAT3","2026-09-27"],[null,null,"LELAKI",null,"Warganegara","TAMAN WAWASAN","ETD","2026-09-27"],["19",null,"LELAKI","DUSUN","Warganegara","KAMPUS IPG TAWAU","ETD","2026-09-27"],[null,null,"PEREMPUAN","BAJAU","Warganegara","KAMPUS IPG TAWAU","ETD","2026-09-27"],[null,null,"PEREMPUAN","BAJAU","Warganegara","KG TG BATU LAUT","ETD","2026-09-27"],["18",null,"PEREMPUAN","BAJAU","Warganegara","KG TG BATU LAUT","ETD","2026-09-27"],["19",null,"PEREMPUAN","MELAYU","Warganegara","KAMPUS IPG TAWAU","ETD","2026-09-27"],["9",null,"PEREMPUAN","BUGIS","Warganegara","KG TG BATU KERAMAT","ETD","2026-09-27"],["24",null,"PEREMPUAN","MELAYU","Warganegara","KAMPUS IPG TAWAU","ETD","2026-09-27"],["19",null,"PEREMPUAN","IBAN","Warganegara","KAMPUS IPG TAWAU","ETD","2026-09-27"],["18",null,"PEREMPUAN","CINA","Warganegara","KAMPUS IPG TAWAU","ETD","2026-09-27"],["2",null,"LELAKI","BOLONGAN","Warganegara","KG TG BATU DARAT","ETD","2026-09-27"],["13",null,"LELAKI","BUGIS","Warganegara","TG BATU KERAMAT","ETD","2026-09-27"],["7",null,"LELAKI","BUGIS","Warganegara","TAMAN DAMAI","ETD","2026-09-27"],["26",null,"LELAKI","BUGIS","Warganegara","KG JAWA","ETD","2026-09-27"],["24",null,"PEREMPUAN","BAJAU","Warganegara","TAMAN AIR PANAS","ETD","2026-09-27"],["13",null,"LELAKI","BAJAU","Warganegara","ASRAMA SMK KUHARA","ETD","2026-09-27"],["20",null,"LELAKI","BAJAU","Warganegara","KAMPUS IPG TAWAU","ETD","2026-09-27"],["14",null,"LELAKI","TIDUNG","Warganegara","ASRAMA SMK KUHARA","ETD","2026-09-27"],["29",null,"PEREMPUAN","BAJAU","Warganegara","TAMAN KINABUTAN","ETD","2026-09-27"],["15",null,"LELAKI","TIDUNG","Warganegara","ASRAMA SMK KUHARA","ETD","2026-09-27"],["13",null,"LELAKI","TIDUNG","Warganegara","ASRAMA SMK KUHARA","ETD","2026-09-27"],["1",null,"PEREMPUAN","BANJAR","Warganegara","BATU 4 1/2 JALAN APAS","ETD","2026-09-27"],["16",null,"PEREMPUAN","BUTON","Warganegara","ASRAMA SMK KUHARA","ETD","2026-09-27"],["2",null,"LELAKI","BAJAU","Warganegara","KG SRI BALUNG","ETD","2026-09-27"],["18",null,"PEREMPUAN","BUGIS","Warganegara","KAMPUS IPG TAWAU","ETD","2026-09-27"],["22",null,"LELAKI","BISAYA","Warganegara","TAMAN HILTOP","ETD","2026-09-27"],["51",null,"LELAKI","BAJAU","Warganegara","KG TAWAU LAMA","ETD","2026-09-27"],["19",null,"LELAKI","TIDUNG","Warganegara","KAMPUS IPG TAWAU","ETD","2026-09-27"],["11",null,"LELAKI","BAJAU","Warganegara","BATU 2 JALAN APAS","ETD","2026-09-27"],["18",null,"PEREMPUAN","BAJAU","Warganegara","POLITEKNIK TAWAU","ETD","2026-09-27"],["28",null,"PEREMPUAN","BUGIS","Warganegara","PASIR PUTIH","ETD","2026-09-27"],["32",null,"PEREMPUAN","BAJAU","Warganegara","JALAN DAMAI","ETD","2026-09-27"],["3",null,"PEREMPUAN","BAJAU","Warganegara","BATU 3 JALAN APAS","ETD","2026-09-27"],["15",null,"PEREMPUAN","TIDUNG","Warganegara","ASRAMA SMK KUHARA","ETD","2026-09-27"],["7",null,"PEREMPUAN","BUGIS","Warganegara","KG TG BATU LAUT","ETD","2026-09-27"],["1",null,"PEREMPUAN","BAJAU","Warganegara","BATU 3 1/2","ETD","2026-09-27"],[null,null,"LELAKI","CINA","Warganegara","TAMAN HOTSPRING JAYA","KLINIK HOTSPRING","2026-09-27"],[null,null,"PEREMPUAN","CINA","Warganegara","TAMAN KUHARA INDAH","KLINIK HOTSPRING","2026-09-27"],[null,null,"PEREMPUAN","CINA","Warganegara","TAMAN SUN SHU","KLINIK HOTSPRING","2026-09-27"],["45",null,"PEREMPUAN","CINA","Warganegara","TAMAN DAYA USAHA","KLINIK HOTSPRING","2026-09-27"],[null,null,"LELAKI","CINA","Warganegara","KG MUHIBBAH RAYA","KLINIK HOTSPRING","2026-09-27"],["16",null,"PEREMPUAN","MELAYU","Warganegara","TAMAN RICH PARK BATU 2 JALAN APAS","KLINIK HOTSPRING","2026-09-27"],["25",null,"LELAKI","BAJAU","Warganegara","TAMAN SRI APAS","ETD","2026-09-28"],["40",null,"PEREMPUAN","BUGIS","Warganegara","TAMAN RIA 6, TAWAU","ETD","2026-09-28"],["12",null,"PEREMPUAN","BUGIS","Warganegara","KG PASIR PUTIH",null,"2026-09-27"],[null,null,"PEREMPUAN",null,"Warganegara","Kinabutan ria","ETD","2026-09-27"],[null,null,"PEREMPUAN",null,"Warganegara","Ranggu","ETD","2026-09-27"],[null,null,"LELAKI",null,"Warganegara","Apas permai","ETD","2026-09-27"],["18",null,"PEREMPUAN","KADAZAN/DUSUN","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["17",null,"PEREMPUAN","CINA","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["18",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau",null,"2026-09-27"],["21",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["20",null,"PEREMPUAN","IBAN","Warganegara","IPG Kampus Tawau","Klinik Mabello taman sawit","2026-09-26"],["20",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","Klinik Mabello Helmina","2026-09-26"],["18",null,"PEREMPUAN","KADAZAN/DUSUN","Warganegara","IPG Kampus Tawau","Farmasi ","2026-09-26"],["18",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","KLINIK MABELLO SRI BALUNG","2026-09-26"],["20",null,"PEREMPUAN","JAWA","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["18",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","Kecemasan hospital tawau Dan klinik family di bandar","2026-09-26"],["18",null,"PEREMPUAN","CINA","Warganegara","IPG Kampus Tawau","PUTRAMED CLINICS BALUNG","2026-09-26"],["21",null,"PEREMPUAN","IBAN","Warganegara","IPG Kampus Tawau","PUTRAMED CLINICS BALUNG","2026-09-26"],["18",null,"PEREMPUAN","SUNGAI","Warganegara","IPG Kampus Tawau","Klinik Mabello Sri Balung","2026-09-26"],["20",null,"PEREMPUAN","BISAYA","Warganegara","IPG Kampus Tawau",null,"2026-09-27"],["25",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","Tidak","2026-09-27"],["20",null,"PEREMPUAN","BAJAU","Warganegara","IPG Kampus Tawau",null,"2026-09-27"],["18",null,"PEREMPUAN","SUNGAI","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["18",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["19",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","Klinik Mabello Sri Balung","2026-09-26"],["25",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["27",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["20",null,"LELAKI","KADAZAN/DUSUN","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["22",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau",null,"2026-09-27"],["26",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["26",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["30",null,"PEREMPUAN","BUMIPUTERA SARAWAK (MELANAU)","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["24",null,"LELAKI","MELAYU","Warganegara","IPG Kampus Tawau","Permai Polyclinics","2026-09-27"],["35",null,"PEREMPUAN","BAJAU","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["22",null,"PEREMPUAN","BRUNEI","Warganegara","IPG Kampus Tawau",null,"2026-09-27"],["19",null,"PEREMPUAN","KADAZAN/DUSUN","Warganegara","IPG Kampus Tawau",null,"2026-09-27"],["22",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["19",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","PUTRAMED CLINICS BALUNG","2026-09-26"],["21",null,"LELAKI","BUGIS","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["20",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","PUTRAMED CLINICS BALUNG","2026-09-27"],["18",null,"LELAKI","KADAZAN/DUSUN","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["22",null,"LELAKI","MELAYU","Warganegara","IPG Kampus Tawau","Makan ubat sahaja","2026-09-26"],["19",null,"PEREMPUAN","BISAYA","Warganegara","IPG Kampus Tawau",null,"2026-09-27"],["18",null,"LELAKI","KADAZAN/DUSUN","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["18",null,"LELAKI","BIDAYUH","Warganegara","IPG Kampus Tawau","farmasi di tawau","2026-09-26"],["21",null,"LELAKI","MELAYU","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["20",null,"LELAKI","BUGIS","Warganegara","IPG Kampus Tawau","Klinik AVI Sri Indah","2026-09-27"],["18",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau",null,"2026-09-27"],["18",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau",null,"2026-09-27"],["18",null,"LELAKI","KADAZAN/DUSUN","Warganegara","IPG Kampus Tawau","FARMASI GOOD DAY BALUNG","2026-09-25"],["18",null,"PEREMPUAN","Bugis","Warganegara","IPG Kampus Tawau",null,"2026-09-27"],["21",null,"LELAKI","MELAYU","Warganegara","IPG Kampus Tawau","Berbekalkan ubat","2026-09-27"],["18",null,"PEREMPUAN","CINA","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-27"],["19",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-26"],["20",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","DAN PUTRAMED CLINICS BALUNG","2026-09-26"],["20",null,"PEREMPUAN","BUGIS","Warganegara","IPG Kampus Tawau","UBAT TERSEDIA","2026-09-26"],["19",null,"PEREMPUAN","KADAZAN/DUSUN","Warganegara","IPG Kampus Tawau","PERMAI POLYCLINIC","2026-09-26"],["20",null,"LELAKI","MELAYU","Warganegara","IPG Kampus Tawau",null,"2026-09-27"],["20",null,"LELAKI","SULUk","Warganegara","IPG Kampus Tawau","KLINIK MABELLO BALUNG","2026-09-26"],["18",null,"LELAKI","MELAYU","Warganegara","IPG Kampus Tawau",null,"2026-09-27"],["20",null,"LELAKI","MELAYU","Warganegara","IPG Kampus Tawau","Mula berkurangan tetapi masih ada sedikit rasa cirit","2026-09-27"],["19",null,"PEREMPUAN","BAJAU","Warganegara","IPG Kampus Tawau","KLINIK MABELLO SRI BALUNG","2026-09-27"],["18",null,"PEREMPUAN","BUGIS","Warganegara","IPG Kampus Tawau","pmg pharmacy","2026-09-27"],["19",null,"PEREMPUAN","BUGIS","Warganegara","IPG Kampus Tawau","belum mendapat rawatan","2026-09-27"],["25",null,"PEREMPUAN","MELAYU","Warganegara","IPG Kampus Tawau","KECEMASAN HOSPITAL TAWAU","2026-09-27"],["19",null,"PEREMPUAN","BUGIS","Warganegara","IPG Kampus Tawau",null,"2026-09-27"],["14",null,"PEREMPUAN","BUGIS","Warganegara","Asrama SMK Kuhara",null,"2026-09-25"],["14",null,"LELAKI","BUGIS","Warganegara","Asrama SMK Kuhara",null,"2026-09-26"],["14",null,"PEREMPUAN","BAJAU","Warganegara","Asrama SMK Kuhara",null,"2026-09-27"],["14",null,"LELAKI","BAJAU","Warganegara","Asrama SMK Kuhara",null,"2026-09-25"],["14",null,"PEREMPUAN","BAJAU","Warganegara","Asrama SMK Kuhara",null,"2026-09-25"],["13",null,"LELAKI","BUGIS","Warganegara","Asrama SMK Kuhara",null,"2026-09-24"],["14",null,"PEREMPUAN","BAJAU","Warganegara","Asrama SMK Kuhara",null,"2026-09-25"],["14",null,"LELAKI","BAJAU","Warganegara","Asrama SMK Kuhara",null,"2026-09-26"],["13",null,"PEREMPUAN","BAJAU","Warganegara","Asrama SMK Kuhara",null,"2026-09-25"],["14",null,"PEREMPUAN","BAJAU","Warganegara","Asrama SMK Kuhara",null,"2026-09-25"],["13",null,"LELAKI","BAJAU","Warganegara","Asrama SMK Kuhara",null,"2026-09-26"],["13",null,"PEREMPUAN","Tidung","Warganegara","Asrama SMK Kuhara",null,"2026-09-27"],["13",null,"LELAKI","BANJAR","Warganegara","Asrama SMK Kuhara",null,"2026-09-27"],["26",null,"LELAKI","BOLONGAN","Warganegara","PPR TAMAN SRI SEMARAK",null,"2026-09-28"],["37",null,"PEREMPUAN",null,"Warganegara","KAMPUNG TANJUNG BATU LAUT",null,"2026-09-28"],["53",null,"LELAKI","CINA","Warganegara","TAMAN LEEKA",null,"2026-09-27"],["11",null,"LELAKI","CINA","Warganegara","LORONG 34, TAMAN SEMARAK",null,"2026-09-27"],["16",null,"LELAKI","MELAYU","Warganegara","TAMAN NEW ASIA",null,"2026-09-27"],["61",null,"LELAKI","CINA","Warganegara","TAMAN MEGAH JAYA",null,"2026-09-27"],["41",null,"PEREMPUAN","INDONESIA","Warganegara","KAMPUNG JAWA",null,"2026-09-27"],["20",null,"LELAKI","BUGIS","Warganegara","TAMAN HILLTOP",null,"2026-09-27"],["46",null,"LELAKI","BAJAU","Warganegara","PRIMA RANGGU",null,"2026-09-27"],["14",null,"PEREMPUAN","BRUNEI","Warganegara","TAMAN SEMATAK",null,"2026-09-27"],["23",null,"LELAKI","MELAYU","Warganegara","KEM KUKUSAN",null,"2026-09-27"],["26",null,"PEREMPUAN","BUGIS","Warganegara","KG SENTOSA",null,"2026-09-27"],[null,"8","LELAKI","SULUK","Warganegara","KG KINABUTAN",null,"2026-09-27"],["10",null,"LELAKI","BUGIS","Warganegara","PASIR PUTIH",null,"2026-09-27"],["17",null,"LELAKI","BUGIS","Warganegara","APAS PERMAI",null,"2026-09-27"],["19",null,"PEREMPUAN","BUGIS","Warganegara","KG RANGGU",null,"2026-09-27"],["9",null,"PEREMPUAN","MELAYU","Warganegara","TAMAN KINABUTAN RIA",null,"2026-09-27"],["1",null,"PEREMPUAN","BUGIS","Warganegara","FLAT SABINDO",null,"2026-09-27"],["4",null,"LELAKI","TIDUNG","Warganegara","TAMAN VICTORIA",null,"2026-09-27"],["28",null,"LELAKI","MELAYU","Warganegara","TAWAU",null,"2026-09-28"],["43",null,"PEREMPUAN","BUGIS","Warganegara","TAMAN RIA 1",null,"2026-09-28"],["1",null,"LELAKI","BUGIS","Warganegara","TAMAN SEMARAK",null,"2026-09-28"],["31",null,"LELAKI","CINA","Warganegara","INDAH VILLA",null,"2026-09-28"],["29",null,"LELAKI","CINA","Warganegara","TAMAN GAYA",null,"2026-09-28"],["15",null,"PEREMPUAN","CINA","Warganegara","TAMAN GREENERY",null,"2026-09-28"],["19",null,"LELAKI","CINA","Warganegara","BANDAR SRI INDAH",null,"2026-09-28"],["18",null,"PEREMPUAN","SULUK","Warganegara","JALAN DAMAI",null,"2026-09-28"],[null,"8","LELAKI","BUGIS","Warganegara","TAMAN MILAN",null,"2026-09-28"],["13",null,"LELAKI","CINA","Warganegara","TAMAN GREENERY",null,"2026-09-28"],["49",null,"PEREMPUAN","BUGIS","Warganegara","KG TG BATU LAUT",null,"2026-09-28"],["18",null,"LELAKI","BUGIS","Warganegara","KAMPUS IPG TAWAU",null,"2026-09-27"],["18",null,"LELAKI","BUGIS","Warganegara","KAMPUS IPG TAWAU",null,"2026-09-27"],["21",null,"Lelaki","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["20",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["28",null,"Perempuan","Melayu","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["18",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["20",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["19",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["14",null,"Lelaki","Bumiputera Sabah","Warganegara","KAMPUNG SERUDUNG BARU","KK APAS BALUNG","2026-09-28"],["17",null,"Lelaki","Bumiputera Sabah","Warganegara","BATU 15 JALAN APAS PARIT","KK APAS BALUNG","2026-09-28"],["21",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["22",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["32",null,"Lelaki","Melayu","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["19",null,"Lelaki","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["20",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["25",null,"Lelaki","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["20",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["25",null,"Perempuan","Melayu","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["23",null,"Perempuan","Melayu","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["18",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["23",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["17",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["22",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["19",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["19",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["18",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["18",null,"Perempuan","Melayu","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["19",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["18",null,"Perempuan","Melayu","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["18",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["18",null,"Lelaki","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["19",null,"Perempuan","Melayu","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["20",null,"Lelaki","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["12",null,"Perempuan","Bumiputera Sabah","Warganegara","KG SERUDUNG BARU","KK APAS BALUNG","2026-09-28"],["11",null,"Lelaki","Bumiputera Sabah","Warganegara","TMN SRI BALUNG","KK APAS BALUNG","2026-09-28"],["20",null,"Lelaki","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["30",null,"Lelaki","Bumiputera Sabah","Warganegara","BALUNG","KK APAS BALUNG","2026-09-28"],["19",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["17",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["18",null,"Lelaki","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["17",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["18",null,"Perempuan","Melayu","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["18",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["20",null,"Perempuan","Melayu","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["18",null,"Lelaki","Melayu","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["19",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["20",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["19",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["17",null,"Lelaki","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["20",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["16",null,"Lelaki","Bumiputera Sabah","Warganegara","SMK BALUNG","KK APAS BALUNG","2026-09-28"],["16",null,"Perempuan","Bumiputera Sabah","Warganegara","SMK BALUNG","KK APAS BALUNG","2026-09-28"],["17",null,"Lelaki","Melayu","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["18",null,"Lelaki","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["20",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["20",null,"Lelaki","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["16",null,"Perempuan","Bumiputera Sabah","Warganegara","SMK BALUNG","KK APAS BALUNG","2026-09-28"],["20",null,"Lelaki","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["19",null,"Perempuan","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["14",null,"Perempuan","Bumiputera Sabah","Warganegara","SMK BALUNG","KK APAS BALUNG","2026-09-28"],["16",null,"Perempuan","Bumiputera Sabah","Warganegara","SMK BALUNG","KK APAS BALUNG","2026-09-28"],["16",null,"Lelaki","Bumiputera Sabah","Warganegara","SMK BALUNG","KK APAS BALUNG","2026-09-28"],["16",null,"Perempuan","Bumiputera Sabah","Warganegara","SMK BALUNG","KK APAS BALUNG","2026-09-28"],["15",null,"Lelaki","Bumiputera Sabah","Warganegara","SMK BALUNG","KK APAS BALUNG","2026-09-28"],["17",null,"Lelaki","Melayu","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-28"],["15",null,"Perempuan","Bumiputera Sabah","Warganegara","SMK BALUNG","KK APAS BALUNG","2026-09-28"],["16",null,"Lelaki","Bumiputera Sabah","Warganegara","SMK BALUNG","KK APAS BALUNG","2026-09-28"],["16",null,"Perempuan","Bumiputera Sabah","Warganegara","SMK BALUNG","KK APAS BALUNG","2026-09-28"],["2",null,"Lelaki","Bumiputera Sabah","Warganegara","KG WAKUBA","KK APAS BALUNG","2026-09-29"],["12",null,"Lelaki","Bumiputera Sabah","Warganegara","TMN SRI BALUNG","KK APAS BALUNG","2026-09-29"],["16",null,"Perempuan","Bumiputera Sabah","Warganegara","BATU 38 JLN APAS","KK APAS BALUNG","2026-09-29"],["17",null,"Lelaki","Bumiputera Sabah","Warganegara","PERUMAHAN GURU SK WAKUBA","KK APAS BALUNG","2026-09-29"],["17",null,"Lelaki","Bumiputera Sabah","Warganegara","KG SUNGAI GADING","KK APAS BALUNG","2026-09-29"],["19",null,"Lelaki","Bumiputera Sabah","Warganegara","IPG TAWAU","KK APAS BALUNG","2026-09-29"],["28",null,"LELAKI","Bumiputera Sabah","Warganegara","TAMAN SEMARAK","HOSPITAL TAWAU","2026-09-28"],["24",null,"PEREMPUAN","BAJAU","Warganegara","TAMAN SEMARAK MEGAH","PAC TAWAU","2026-09-28"],["2",null,"LELAKI","BUGIS","Warganegara","TAWAU","ED TAWAU","2026-09-29"],["2",null,"PEREMPUAN","IBAN","Warganegara","TANJUNG BATU DARAT","ED TAWAU","2026-09-29"],["11",null,"PEREMPUAN","TIDUNG","Warganegara","TAMAN KINABUTAN RIA","ED TAWAU","2026-09-29"],["35",null,"PEREMPUAN","SULUK","Bukan warganegara","BLOK 3, KAMPUNG TITINGAN","ED TAWAU","2026-09-29"],["2",null,"LELAKI","MELAYU","Warganegara","BEREK PASUKAN POLIS MARIN","ED TAWAU","2026-09-29"],["16",null,"PEREMPUAN","BUGIS","Warganegara","TAMAN KINABUTAN RIA","ED TAWAU","2026-09-29"],["14",null,"PEREMPUAN","BUGIS","Warganegara","LORONG BUKIT GOOD VIEW, BATU 3","ED TAWAU","2026-09-29"],["13",null,"LELAKI","DUSUN","Warganegara","KONGSI 8, LORONG 4, BATU 5","ED TAWAU","2026-09-29"],["6",null,"PEREMPUAN","BUGIS","Warganegara","KAMPUNG SUNGAI IMAM","ED TAWAU","2026-09-29"],["12",null,"PEREMPUAN","BUGIS","Warganegara","KONGSI 10","ED TAWAU","2026-09-29"],["18",null,"PEREMPUAN","BUGIS","Warganegara","IPG TAWAU","ED TAWAU","2026-09-29"],["7",null,"LELAKI","BUGIS","Warganegara","TAMAN SRI BALUNG","ED TAWAU","2026-09-29"],["3",null,"PEREMPUAN","BAJAU","Warganegara","BATU 6","ED TAWAU","2026-09-29"],["23",null,"PEREMPUAN","MURUT","Warganegara","JALAN DURAHMAN","ED TAWAU","2026-09-29"],["27",null,"PEREMPUAN","BANJAR","Warganegara","TAWAU","ED TAWAU","2026-09-29"],["1",null,"LELAKI",null,"Warganegara","BATU 8","ED TAWAU","2026-09-29"],["27",null,"LELAKI","MELAYU","Warganegara","KEM KUKUSAN","ED TAWAU","2026-09-29"],["15",null,"LELAKI","BAJAU","Warganegara","TANJUNG BATU LAUT","ED TAWAU","2026-09-29"],["8",null,"LELAKI","BUGIS","Warganegara","BALUNG","ED TAWAU","2026-09-29"],["13",null,"LELAKI","CINA","Warganegara","TAMAN SHAMROCK","KLINIK HOTSPRING","2026-09-28"],["13",null,"LELAKI","CINA","Warganegara","TAMAN MAYFLOWER","KLINIK HOTSPRING","2026-09-28"],["33",null,"LELAKI","CINA","Warganegara","TAMAN MELUR","KLINIK HOTSPRING","2026-09-28"],["19",null,"LELAKI","MELAYU","Warganegara","TAMAN SEMARAK MEGAH","KLINIK HOTSPRING","2026-09-28"],["37",null,"PEREMPUAN","MELAYU","Warganegara","TAMAN RICH","KLINIK HOTSPRING","2026-09-29"],["23",null,"LELAKI","CINA","Warganegara","TAMAN SCENERY","KLINIK HOTSPRING","2026-09-29"],["16",null,"LELAKI","CINA","Warganegara","TAMAN HOTSPRING UNIJAYA","KLINIK HOTSPRING","2026-09-29"],["37",null,"LELAKI","MELAYU","Warganegara","TAMAN RICH","KLINIK HOTSPRING","2026-09-29"],["15",null,"PEREMPUAN","MELAYU","Warganegara","TAMAN VICTORIA","KLINIK HOTSPRING","2026-09-29"],["34",null,"LELAKI","CINA","Warganegara","KAMPUNG MUHIBBAH RAYA","KLINIK HOTSPRING","2026-09-29"],["4",null,"PEREMPUAN","MELAYU","Warganegara","GUDANG 4","ED TAWAU","2026-09-29"],["2",null,"PEREMPUAN",null,"Warganegara","GUDANG 4","ED TAWAU","2026-09-29"],["4",null,"LELAKI",null,"Warganegara","TANJUNG BATU LAUT","ED TAWAU","2026-09-29"],["31",null,"PEREMPUAN","BAJAU","Warganegara","KAMPUNG SRI AMAN","ED TAWAU","2026-09-29"],["2",null,"PEREMPUAN",null,"Warganegara","KAMPUNG KINABUTAN","ED TAWAU","2026-09-29"],["28",null,"LELAKI",null,"Bukan warganegara","TAMAN SEMARAK","WAD 9","2026-09-29"],["24",null,"PEREMPUAN",null,"Warganegara","KALABAKAN","ED TAWAU","2026-09-29"],["13",null,"LELAKI","PRIBUMI SABAH","Warganegara","KAMPUNG SUNGAI IMAM","HOSPITAL TAWAU","2026-09-29"],["3",null,"LELAKI","BUGIS","Warganegara","TAMAN DOMINIC","ED TAWAU","2026-09-30"],["12",null,"PEREMPUAN",null,"Warganegara","TAMAN BUKIT TAWAU","ED TAWAU","2026-09-30"],["16",null,"PEREMPUAN","BOLONGAN","Warganegara",null,"ED TAWAU","2026-09-30"],["23",null,"LELAKI","BUGIS","Warganegara","POLITEKNIK BALUNG","ED TAWAU","2026-09-30"],["1",null,"LELAKI","BUGIS","Warganegara","TANJUNG BATU LAUT","ED TAWAU","2026-09-30"],["24",null,"LELAKI","BUGIS","Warganegara","TANJUNG BATU DARAT","ED TAWAU","2026-09-30"],["31",null,"LELAKI","BUGIS","Warganegara","KAMPUNG PUKAT LAUT","ED TAWAU","2026-09-30"],["13",null,"LELAKI","MELAYU","Warganegara","KAMPUNG SUNGAI PUKUL","ED TAWAU","2026-09-30"],["19",null,"PEREMPUAN","BUGIS","Warganegara","KONGSI 8","ED TAWAU","2026-09-30"],["1",null,"LELAKI","SULUK","Warganegara","TAMAN SEMARAK FASA 2A","ED TAWAU","2026-09-30"],["65",null,"PEREMPUAN","BUGIS","Warganegara","FELDA UMAS","ED TAWAU","2026-09-30"],["13",null,"LELAKI","MELAYU","Warganegara","KAMPUNG MEROTAI BESAR","ED TAWAU","2026-09-30"],[null,"5","PEREMPUAN","BUGIS","Warganegara","TANJUNG BATU DARAT","ED TAWAU","2026-09-30"],["15",null,"PEREMPUAN","JAWA","Warganegara","KAMPUNG SUNGAI HJ MATAHIR","ED TAWAU","2026-09-30"],["1",null,"PEREMPUAN","BAJAU","Warganegara","KAMPUNG BATU PAYUNG","ED TAWAU","2026-09-30"],["7",null,"LELAKI","BAJAU","Warganegara","BATU 2 JALAN APAS","ED TAWAU","2026-09-30"],["3",null,"LELAKI","BUGIS","Warganegara","TAMAN DOMINIC","ED TAWAU","2026-09-30"],["27",null,"PEREMPUAN","BUGIS","Warganegara","BLOK E, PPR SEMARAK","PAC TAWAU","2026-09-30"],["11",null,"LELAKI","CINA","Warganegara","TAMAN GOOD HOPE, BATU 4 1/2","KLINIK HOTSPRING","2026-09-30"],["15",null,"LELAKI","MELAYU","Warganegara","LORONG 3, TAMAN SEMARAK JAYA","KLINIK HOTSPRING","2026-09-30"]]}</script>
+<script>
+(() => {
+"use strict";
+
+/* ---------- constants ---------- */
+const DAY = 86400000;
+const NA = "Not stated";
+const PALETTE = ["#0E6F73","#D08C1A","#6A55A5","#C24A3E","#3E8E4F","#2F6DB5","#B0567F","#8A7440","#4FA3A5","#E0A96D","#5C6F9E","#9DB35A"];
+const OTHERS = "Others";
+const AGE_SCHEMES = {
+  standard: {label:"Standard (5- and 10-year bands)", groups:["<1","1–4","5–9","10–14","15–19","20–24","25–29","30–39","40–49","50–59","60+"],
+    cut:a => a<1?"<1":a<5?"1–4":a<10?"5–9":a<15?"10–14":a<20?"15–19":a<25?"20–24":a<30?"25–29":a<40?"30–39":a<50?"40–49":a<60?"50–59":"60+"},
+  custom: {label:"Under 5, 5–17, 18–29, 30–60, over 60", groups:["Under 5","5–17","18–29","30–60","Over 60"],
+    cut:a => a<5?"Under 5":a<18?"5–17":a<30?"18–29":a<61?"30–60":"Over 60"}
+};
+let AGE_GROUPS = AGE_SCHEMES.standard.groups, AGE_CUT = AGE_SCHEMES.standard.cut;
+const GENDER_COL = {"Male":"#0E6F73","Female":"#D08C1A"};
+const FTYPE_ORDER = ["Hospital (ED or ward)","Klinik Kesihatan","Private hospital","Private clinic","Pharmacy","No facility visit","Other or unclear",NA];
+const FTYPE_COL = {"Hospital (ED or ward)":"#C24A3E","Private hospital":"#6A55A5","Klinik Kesihatan":"#2F6DB5","Private clinic":"#0E6F73","Pharmacy":"#D08C1A","No facility visit":"#8A7440","Other or unclear":"#5C6F9E"};
+const NULLS = new Set(["","-","--","NIL","NILL","N/A","NA","TIADA","NONE","NULL","TIDAK DIKETAHUI","UNKNOWN","TIDAK BERKENAAN","0","."]);
+const ACRONYMS = new Set(["IPG","SMK","SK","SJK","ETD","MAT","TSMC","PPR","BSI","SESB","BDC","LCN","MPT","KD","KK","PKK","HQE","IJN","SESB","UMS","UiTM","MRSM","KKM","JKNS","AVI","PMG","II","III","IV"]);
+const FIELDS = [
+  {k:"date", label:"Epidemic curve date", re:/tarikh|date|onset|rawatan|mula/i, not:/timestamp|cap masa|lahir|birth/i},
+  {k:"ts",   label:"Submission time (for year checks)", re:/timestamp|cap masa|submitted|masa hantar/i},
+  {k:"age",  label:"Age (or age in years)", re:/umur|^age|age\b|^tahun$|^thn$|^years?$|^yrs?$|\(tahun\)|in years/i, not:/bulan|month/i},
+  {k:"ageMo",label:"Age in months (if in a separate column)", re:/^bulan$|^bln$|^months?$|^mths?$|\(bulan\)|in months/i},
+  {k:"gender",label:"Gender", re:/jantina|gender|^sex|sex\b/i},
+  {k:"eth",  label:"Ethnicity", re:/bangsa|ethnic|race|kaum|etnik/i},
+  {k:"nat",  label:"Nationality", re:/warganegara|nationality|citizen|kerakyatan/i},
+  {k:"loc",  label:"Locality / address", re:/alamat|address|locality|lokaliti|lokasi|kampung|tempat tinggal|residence/i},
+  {k:"fac",  label:"Reporting facility", re:/fasiliti|facility|klinik|hospital|pusat rawatan/i},
+  {k:"name", label:"Name (duplicate check only)", re:/^nama$|^name$|nama pesakit|patient name|^nama\b/i, not:/pelapor|reporter|fasiliti|klinik/i},
+  {k:"ic",   label:"IC / ID (duplicate check only)", re:/kad pengenalan|mykad|\bic\b|no\.? ?kp|passport|pasport|identity/i},
+];
+const DIMS = [
+  {k:"ageGroup",label:"Age group"},{k:"gender",label:"Gender"},{k:"eth",label:"Ethnicity"},
+  {k:"nat",label:"Nationality"},{k:"loc",label:"Locality"},{k:"fac",label:"Facility"},{k:"facType",label:"Facility type"}
+];
+
+/* ---------- state ---------- */
+const S = {
+  fileName:"", wb:null, sheet:"", headers:[], rows:[], map:{},
+  opts:{dedup:true, harm:true, includeOut:false},
+  recs:[], quality:{}, filters:{}, stackBy:"none", charts:{}, days:[], colorMaps:{}
+};
+DIMS.forEach(d => S.filters[d.k] = new Set());
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const el = (tag, attrs={}, html) => { const e=document.createElement(tag); for(const k in attrs){ if(k==="class") e.className=attrs[k]; else e.setAttribute(k,attrs[k]); } if(html!=null) e.innerHTML=html; return e; };
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clean = v => v==null ? "" : String(v).replace(/[\t\r\n\u00A0]+/g," ").replace(/\s+/g," ").trim();
+const isNull = v => NULLS.has(clean(v).toUpperCase());
+const pct = (a,b) => b ? Math.round(a*1000/b)/10 : 0;
+const fmtD = (ms, o={day:"numeric",month:"short"}) => new Date(ms).toLocaleDateString("en-GB",{timeZone:"UTC",...o});
+const fmtFull = ms => new Date(ms).toLocaleDateString("en-GB",{timeZone:"UTC",weekday:"short",day:"numeric",month:"short",year:"numeric"});
+function titleCase(s){
+  return s.split(" ").map(w => {
+    const u = w.toUpperCase();
+    if (ACRONYMS.has(u)) return u;
+    if (/^[0-9]/.test(w)) return u;
+    if (u.length<=4 && !/[AEIOU]/.test(u.replace(/[^A-Z]/g,"")) && /[A-Z]/.test(u)) return u;
+    return w.split(/([\/\-(])/).map(p => p.length ? p[0].toUpperCase()+p.slice(1).toLowerCase() : p).join("");
+  }).join(" ");
+}
+function hexA(hex, a){ const n=parseInt(hex.slice(1),16); return `rgba(${n>>16},${(n>>8)&255},${n&255},${a})`; }
+
+/* ---------- parsing ---------- */
+function serialToMs(n){ return Math.round((n - 25569) * DAY); }
+function utcDay(y,m,d){ const t=Date.UTC(y,m-1,d); const dt=new Date(t); return (dt.getUTCFullYear()===y && dt.getUTCMonth()===m-1 && dt.getUTCDate()===d) ? t : null; }
+function parseDateCell(v){
+  // returns {ms, noYear} or null
+  if (v==null || v==="") return null;
+  if (v instanceof Date && !isNaN(v)) return {ms: Date.UTC(v.getFullYear(),v.getMonth(),v.getDate())};
+  if (typeof v === "number"){
+    if (v>20000 && v<80000){ const ms=serialToMs(v); const d=new Date(ms); return {ms:Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()), tms:ms}; }
+    return null;
+  }
+  const s = clean(v);
+  let m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})(?:[ T](\d{1,2}):(\d{2}))?/);
+  if (m){ const ms=utcDay(+m[1],+m[2],+m[3]); return ms==null?null:{ms}; }
+  m = s.match(/^(\d{1,2})\s*[-\/.]\s*(\d{1,2})(?:\s*[-\/.]\s*(\d{2,4}))?(?:\s|$)/);
+  if (m){
+    let y = m[3] ? +m[3] : null; if (y!=null && y<100) y += 2000;
+    const ms = utcDay(y ?? 2000, +m[2], +m[1]);
+    if (ms==null) return null;
+    return y==null ? {ms, noYear:true, d:+m[1], m:+m[2]} : {ms};
+  }
+  // "26 Sep 2026" / "26 September"
+  m = s.match(/^(\d{1,2})\s+([A-Za-z]{3,})\.?\s*(\d{2,4})?$/);
+  if (m){
+    const mi = ["jan","feb","mac","apr","mei","jun","jul","ogo","sep","okt","nov","dis"].indexOf(m[2].slice(0,3).toLowerCase());
+    const me = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"].indexOf(m[2].slice(0,3).toLowerCase());
+    const mo = (me>=0?me:mi)+1; if (mo<1) return null;
+    let y = m[3]? +m[3] : null; if (y!=null && y<100) y+=2000;
+    const ms = utcDay(y ?? 2000, mo, +m[1]); if (ms==null) return null;
+    return y==null ? {ms,noYear:true,d:+m[1],m:mo} : {ms};
+  }
+  return null;
+}
+function parseAge(v){
+  if (v==null || v==="") return null;
+  if (typeof v === "number") return (v>=0 && v<120) ? v : null;
+  const s = clean(v).toUpperCase();
+  if (isNull(s)) return null;
+  if (/^\d+(\.\d+)?$/.test(s)){ const n=+s; return n<120 ? n : null; }
+  let yrs=0, mos=0, days=0, found=false, m;
+  if ((m = s.match(/(\d+(?:\.\d+)?)\s*(TAHUN|THN|TH|YEARS?|YRS?|Y|T)\b/))){ yrs=+m[1]; found=true; }
+  if ((m = s.match(/(\d+)\s*(BULAN|BLN|MONTHS?|MTHS?|MOS?|B|M)\b/))){ mos=+m[1]; found=true; }
+  if ((m = s.match(/(\d+)\s*(HARI|DAYS?|D|H)\b/))){ days=+m[1]; found=true; }
+  if (!found){ m = s.match(/^(\d+(?:\.\d+)?)/); if (m){ yrs=+m[1]; found=true; } }
+  if (!found) return null;
+  const a = yrs + mos/12 + days/365;
+  return a<120 ? a : null;
+}
+function ageGroup(a){ return a==null ? NA : AGE_CUT(a); }
+function fmtAge(a){
+  if (a==null) return "–";
+  if (a<1) return Math.round(a*12)+" mo";
+  if (a<2 && a%1) return (Math.floor(a))+" y "+Math.round((a%1)*12)+" mo";
+  return (Math.round(a*10)/10).toString().replace(/\.0$/,"");
+}
+function normGender(v){
+  const s = clean(v).toUpperCase(); if (isNull(s)) return NA;
+  if (/^(L|M|LELAKI|MALE|LAKI|LAKI-LAKI|MAN|BOY)$/.test(s)) return "Male";
+  if (/^(P|F|PEREMPUAN|FEMALE|WANITA|WOMAN|GIRL)$/.test(s)) return "Female";
+  return titleCase(s.toLowerCase());
+}
+const ETH_MAP = {"MELAYU":"Malay","MALAY":"Malay","CINA":"Chinese","CHINESE":"Chinese","INDIA":"Indian","INDIAN":"Indian",
+  "KADAZAN":"Kadazan/Dusun","DUSUN":"Kadazan/Dusun","KADAZAN/DUSUN":"Kadazan/Dusun","KADAZANDUSUN":"Kadazan/Dusun","KADAZAN DUSUN":"Kadazan/Dusun",
+  "BUMIPUTERA SARAWAK (MELANAU)":"Melanau","MELANAU":"Melanau","COCOS":"Cocos","KOKOS":"Cocos","SINO":"Sino-Native"};
+function normEth(v){ const s=clean(v).toUpperCase(); if (isNull(s)) return NA; return ETH_MAP[s] || titleCase(s.toLowerCase()); }
+function normNat(v){
+  const s=clean(v).toUpperCase(); if (isNull(s)) return NA;
+  if (/^(BUKAN WARGANEGARA|BUKAN WARGA|NON[- ]?CITIZEN|NON[- ]?MALAYSIAN|FOREIGN(ER)?|WARGA ASING|BWN)$/.test(s)) return "Non-citizen";
+  if (/^(WARGANEGARA|WARGANEGARA MALAYSIA|MALAYSIA|MALAYSIAN|CITIZEN|WN)$/.test(s)) return "Malaysian citizen";
+  return titleCase(s.toLowerCase());
+}
+/* facility */
+function facKey(v){
+  let s = clean(v).toUpperCase(); if (isNull(s)) return "";
+  s = s.replace(/^DAN\s+/,"").replace(/\bMAT\s*(\d)/,"MAT $1").replace(/\s*&\s*/g," & ").replace(/[.,]+$/,"").trim();
+  return s;
+}
+function facType(k){
+  if (!k) return NA;
+  if (/\bTSMC\b|MEDICAL CENT|SPECIALIST|PAKAR|KPJ|COLUMBIA/.test(k)) return "Private hospital";
+  if (/\bETD\b|\bED\b|KECEMASAN|EMERGENCY|\bA&E\b|HOSPITAL|\bHOSP\b|\bWAD\b|WARD/.test(k)) return "Hospital (ED or ward)";
+  if (/\bKK\b|KLINIK KESIHATAN|KLINIK DESA|\bKD\b|PKD|HEALTH CLINIC|KLINIK 1MALAYSIA|KLINIK KOMUNITI/.test(k)) return "Klinik Kesihatan";
+  if (/KLINIK|CLINIC|POLIKLINIK|POLYCLINIC|PUTRAMED|MEDISINAR|SURGERI|SURGERY|DISPENSARY/.test(k)) return "Private clinic";
+  if (/FARMASI|PHARMACY|PHARMACI|APOTEK/.test(k)) return "Pharmacy";
+  if (/UBAT|^TIDAK|BELUM|SENDIRI|TIADA RAWATAN|NO TREATMENT|SELF|RUMAH/.test(k)) return "No facility visit";
+  return "Other or unclear";
+}
+/* locality */
+const LOC_EXP = {KG:"KAMPUNG",KPG:"KAMPUNG",KAMP:"KAMPUNG",TMN:"TAMAN",TG:"TANJUNG",TJG:"TANJUNG",JLN:"JALAN",JL:"JALAN",LRG:"LORONG",LOR:"LORONG",
+  BT:"BATU",SG:"SUNGAI",SGT:"SUNGAI",BDR:"BANDAR",KWS:"KAWASAN",PPR:"PPR",HILTOP:"HILLTOP",BLOCK:"BLOK",FLAT:"FLAT",RMH:"RUMAH",KEM:"KEM",KABOTA:"KUBOTA"};
+const LOC_DROP = new Set(["TAWAU","SABAH","MALAYSIA","DAERAH"]);
+function locClean(v){
+  let s = clean(v).toUpperCase(); if (isNull(s)) return "";
+  s = s.replace(/[,;:]/g," ").replace(/\bNO\.?\s*\d+[A-Z]?(-\d+)*\b/g," ").replace(/\bTB\s*\d+\b/g," ").replace(/\bLOT\s*[A-Z]?\d+\b/g," ")
+       .replace(/\b\d{5}\b/g," ").replace(/\b\d{4,}\b/g," ").replace(/\bNO(?=\d)/g," ").replace(/\s+/g," ").trim();
+  let t = s.split(" ").filter(Boolean).map(w => LOC_EXP[w] || w);
+  // drop trailing district/state words ("... TAWAU SABAH") but keep them inside a place name
+  while (t.length>3 && LOC_DROP.has(t[t.length-1])) t.pop();
+  if (!t.length) t = clean(v).toUpperCase().split(" ").map(w=>LOC_EXP[w]||w);
+  return t.join(" ");
+}
+function locKey(c){
+  const t = c.split(" ").filter(w => w!=="KAMPUNG" && w!=="TAMAN" && w!=="KAMPUS");
+  const u = t.filter(w => !LOC_DROP.has(w));
+  return (u.length ? u : t).sort().join(" ");
+}
+function lev(a,b){ if (Math.abs(a.length-b.length)>1) return 9; const m=a.length,n=b.length; let p=Array.from({length:n+1},(_,i)=>i);
+  for(let i=1;i<=m;i++){ const c=[i]; for(let j=1;j<=n;j++) c[j]=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1)); p=c; } return p[n]; }
+
+/* ---------- file loading ---------- */
+function readFile(file){
+  S.note = "";
+  const err = $("#err"); err.hidden = true;
+  if (typeof XLSX === "undefined"){ showErr("The spreadsheet reader could not load. Check your internet connection and reload the page."); return; }
+  const r = new FileReader();
+  r.onload = e => {
+    try{
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:"array", cellDates:false});
+      S.wb = wb; S.fileName = file.name;
+      const best = pickSheet(wb);
+      loadSheet(best);
+    }catch(ex){ console.error(ex); showErr("This file could not be read. Save it as .xlsx or .csv and try again."); }
+  };
+  r.readAsArrayBuffer(file);
+}
+function showErr(m){ const e=$("#err"); e.textContent=m; e.hidden=false; $("#empty").hidden=false; $("#app").hidden=true; }
+function scoreHeaders(h){ return FIELDS.reduce((a,f)=> a + (h.some(x => f.re.test(x) && !(f.not && f.not.test(x)))?1:0), 0); }
+function sheetMatrix(name){
+  return XLSX.utils.sheet_to_json(S.wb.Sheets[name], {header:1, raw:true, defval:null, blankrows:false});
+}
+function findHeaderRow(m){
+  let best=0, bs=-1;
+  for (let i=0;i<Math.min(10,m.length);i++){ const h=(m[i]||[]).map(x=>clean(x)); const sc=scoreHeaders(h); if (sc>bs){bs=sc;best=i;} }
+  return best;
+}
+function pickSheet(wb){
+  let best=wb.SheetNames[0], bs=-1;
+  wb.SheetNames.forEach(n => { const m=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:false});
+    if (!m.length) return; const hr=findHeaderRow(m); const sc=scoreHeaders((m[hr]||[]).map(x=>clean(x)))*1000 + m.length; if (sc>bs){bs=sc;best=n;} });
+  return best;
+}
+function loadSheet(name){
+  S.sheet = name;
+  const m = sheetMatrix(name);
+  const hr = findHeaderRow(m);
+  S.headers = (m[hr]||[]).map((x,i) => clean(x) || `Column ${i+1}`);
+  S.rows = m.slice(hr+1); S.firstRow = hr+2;
+  S.map = autoMap(S.headers);
+  DIMS.forEach(d => S.filters[d.k].clear());
+  buildMapping();
+  $("#empty").hidden = true; $("#app").hidden = false; $("#btnExport").hidden = false;
+  if ($("#title").value === "Outbreak case dashboard") $("#title").value = defaultTitle(S.fileName);
+  process();
+}
+function defaultTitle(fn){
+  const base = fn.replace(/\.[^.]+$/,"").replace(/[_-]+/g," ").trim();
+  return /^age\b/i.test(base) ? "Acute gastroenteritis cases" : (base ? base+" cases" : "Outbreak case dashboard");
+}
+function autoMap(h){
+  const used = new Set(), map = {};
+  FIELDS.forEach(f => {
+    let idx = -1;
+    h.forEach((x,i) => { if (idx<0 && !used.has(i) && f.re.test(x) && !(f.not && f.not.test(x))) idx=i; });
+    map[f.k] = idx; if (idx>=0) used.add(idx);
+  });
+  if (map.date<0 && map.ts>=0) map.date = map.ts;
+  return map;
+}
+function buildMapping(){
+  const g = $("#mapGrid"); g.innerHTML = "";
+  if (S.wb.SheetNames.length>1){
+    const lab = el("label",{}, "Sheet");
+    const sel = el("select",{id:"sheetSel"});
+    S.wb.SheetNames.forEach(n => sel.append(new Option(n,n,false,n===S.sheet)));
+    sel.onchange = () => loadSheet(sel.value);
+    lab.append(sel); g.append(lab);
+  }
+  FIELDS.forEach(f => {
+    const lab = el("label",{}, esc(f.label));
+    const sel = el("select");
+    sel.append(new Option("— not used —", -1));
+    S.headers.forEach((h,i) => sel.append(new Option(h, i, false, S.map[f.k]===i)));
+    sel.value = S.map[f.k];
+    sel.onchange = () => { S.map[f.k] = +sel.value; DIMS.forEach(d=>S.filters[d.k].clear()); process(); };
+    lab.append(sel); g.append(lab);
+  });
+}
+
+/* ---------- processing ---------- */
+function cell(row, k){ const i=S.map[k]; return (i==null||i<0) ? null : row[i]; }
+function process(){
+  const Q = {read:0, empty:0, merged:0, groups:0, dateMissing:0, dateInvalid:[], yearFixed:[], noYear:0, outWindow:[], ageMissing:0, ageInvalid:[], locMerged:0};
+  // 1. raw records
+  let raws = [];
+  S.rows.forEach((row, ri) => {
+    const keys = ["date","age","ageMo","gender","eth","nat","loc","fac","name","ic"];
+    if (!row || keys.every(k => { const v=cell(row,k); return v==null || clean(v)===""; })){ Q.empty++; return; }
+    Q.read++;
+    const r = {row: ri, f:{}};
+    ["date","ts","age","ageMo","gender","eth","nat","loc","fac"].forEach(k => r.f[k] = cell(row,k));
+    const nm = clean(cell(row,"name")).toUpperCase().replace(/\b(BIN|BINTI|BT|BTE|A\/L|A\/P|ANAK|AK)\b/g," ").replace(/[^A-Z]/g,"");
+    const ic = clean(cell(row,"ic")).replace(/[^0-9A-Z]/gi,"");
+    r.keys = []; if (ic.length>=6 && !/^0+$/.test(ic)) r.keys.push("IC:"+ic); if (nm.length>=4) r.keys.push("N:"+nm);
+    r.xrow = S.firstRow + ri;
+    raws.push(r);
+  });
+  // 2. dedupe: same person if IC matches OR normalised name matches (union-find, so chains link up)
+  Q.dupGroups = [];
+  if (S.opts.dedup){
+    const par = raws.map((_,i)=>i), find = i => par[i]===i ? i : (par[i]=find(par[i]));
+    const seen = new Map();
+    raws.forEach((r,i) => r.keys.forEach(k => { if (seen.has(k)){ const a=find(seen.get(k)), b=find(i); if (a!==b) par[Math.max(a,b)]=Math.min(a,b); } else seen.set(k,i); }));
+    const groups = new Map();
+    raws.forEach((r,i) => { const g=find(i); if(!groups.has(g)) groups.set(g,[]); groups.get(g).push(r); });
+    const out = [];
+    groups.forEach(members => {
+      const keep = members[0]; keep.dups = members.length; out.push(keep);
+      members.slice(1).forEach(r => { Q.merged++;
+        for (const k in r.f){ const a=keep.f[k]; if (a==null || clean(a)==="" || isNull(a)) keep.f[k]=r.f[k]; } });
+      if (members.length>1) Q.dupGroups.push({keep:keep.xrow, rows:members.slice(1).map(r=>r.xrow), how: members.some(r=>r.keys.some(k=>k.startsWith("IC:")&&members.filter(m=>m!==r&&m.keys.includes(k)).length)) ? "IC / name" : "name"});
+    });
+    out.sort((a,b)=>a.row-b.row);
+    Q.groups = Q.dupGroups.length;
+    raws = out;
+  }
+  // 3. dates
+  const parsed = raws.map(r => { const p=parseDateCell(r.f.date); const t=parseDateCell(r.f.ts); return {p, t, raw:r.f.date}; });
+  const yrs = {}; parsed.forEach(x => { if (x.t) { const y=new Date(x.t.ms).getUTCFullYear(); yrs[y]=(yrs[y]||0)+1; } else if (x.p && !x.p.noYear){ const y=new Date(x.p.ms).getUTCFullYear(); if (y<=new Date().getUTCFullYear()) yrs[y]=(yrs[y]||0)+1; }});
+  const modeYear = +Object.keys(yrs).sort((a,b)=>yrs[b]-yrs[a])[0] || new Date().getUTCFullYear();
+  const recs = raws.map((r,i) => {
+    const {p,t,raw} = parsed[i];
+    let date=null, dflag=null;
+    const refYear = t ? new Date(t.ms).getUTCFullYear() : modeYear;
+    if (p){
+      date = p.ms;
+      if (p.noYear){ date = utcDay(refYear, p.m, p.d); Q.noYear++; dflag="year assumed"; }
+      else {
+        const y = new Date(p.ms).getUTCFullYear();
+        const limit = t ? t.ms + DAY : Infinity;
+        if (y>refYear || (t && p.ms>limit && y!==refYear)){
+          const d=new Date(p.ms); const fixed = utcDay(refYear, d.getUTCMonth()+1, d.getUTCDate());
+          if (fixed!=null){ Q.yearFixed.push({raw:clean(raw), to:fmtFull(fixed)}); date=fixed; dflag="year corrected"; }
+        }
+      }
+    } else {
+      if (raw==null || clean(raw)==="" || isNull(raw)) Q.dateMissing++; else Q.dateInvalid.push(clean(raw));
+    }
+    let age = parseAge(r.f.age);
+    if (S.map.ageMo>=0){
+      const mo = r.f.ageMo; const mn = (mo==null || clean(mo)==="" || isNull(mo)) ? null : parseFloat(clean(mo));
+      if (mn!=null && !isNaN(mn) && mn>=0 && mn<240) age = (age||0) + mn/12;
+    }
+    if (age==null && S.map.ageMo>=0 && !(r.f.age==null || clean(r.f.age)==="" || isNull(r.f.age))) Q.ageInvalid.push(clean(r.f.age));
+    else if (age==null){ if (r.f.age==null || clean(r.f.age)==="" || isNull(r.f.age)) Q.ageMissing++; else Q.ageInvalid.push(clean(r.f.age)); }
+    const fk = facKey(r.f.fac);
+    return { date, dflag, rawDate: clean(raw), age, ageGroup: ageGroup(age), gender: normGender(r.f.gender), eth: normEth(r.f.eth),
+      nat: normNat(r.f.nat), locRaw: clean(r.f.loc), facKey: fk, facType: facType(fk), dups: r.dups||1 };
+  });
+  // 4. outbreak window (median ± 28 days)
+  const ds = recs.filter(r=>r.date!=null).map(r=>r.date).sort((a,b)=>a-b);
+  if (ds.length){
+    const med = ds[Math.floor(ds.length/2)];
+    recs.forEach(r => { if (r.date!=null && Math.abs(r.date-med) > 28*DAY){ r.outWin=true; Q.outWindow.push({raw:r.rawDate, d:fmtFull(r.date)}); } });
+  }
+  // 5. facility display names
+  const facForms = {};
+  recs.forEach(r => { if (!r.facKey) return; const disp = titleCase(r.facKey.toLowerCase()); (facForms[r.facKey] ||= {}); facForms[r.facKey][disp]=(facForms[r.facKey][disp]||0)+1; });
+  recs.forEach(r => { r.fac = r.facKey ? titleCase(r.facKey.toLowerCase()) : NA; });
+  // 6. locality
+  const lc = recs.map(r => locClean(r.locRaw));
+  if (S.opts.harm){
+    const keyCount = {}, keyForms = {};
+    lc.forEach((c,i) => { if (!c) return; const k=locKey(c); keyCount[k]=(keyCount[k]||0)+1; (keyForms[k] ||= {}); keyForms[k][c]=(keyForms[k][c]||0)+1; });
+    // fuzzy merge single-typo variants (no digits, length >= 7)
+    const keys = Object.keys(keyCount).sort((a,b)=>keyCount[b]-keyCount[a]); const alias = {};
+    keys.forEach((k,i) => { if (/\d/.test(k) || k.length<7) return;
+      for (let j=0;j<i;j++){ const b=keys[j]; if (alias[b] || /\d/.test(b)) continue; if (lev(k,b)===1){ alias[k]=b; break; } } });
+    const disp = {};
+    keys.forEach(k => { const root = alias[k] || k; });
+    const rootForms = {};
+    keys.forEach(k => { const root=alias[k]||k; rootForms[root] ||= {}; for (const f in keyForms[k]) rootForms[root][f]=(rootForms[root][f]||0)+keyForms[k][f]; });
+    for (const root in rootForms){
+      const forms = Object.entries(rootForms[root]).sort((a,b)=> b[1]-a[1] || b[0].length-a[0].length);
+      disp[root] = titleCase(forms[0][0].toLowerCase());
+    }
+    const distinctRaw = new Set(recs.map(r=>r.locRaw.toUpperCase()).filter(Boolean)).size;
+    recs.forEach((r,i) => { r.loc = lc[i] ? disp[alias[locKey(lc[i])]||locKey(lc[i])] : NA; });
+    Q.locMerged = distinctRaw - new Set(recs.map(r=>r.loc).filter(x=>x!==NA)).size;
+  } else {
+    recs.forEach((r,i) => { r.loc = r.locRaw && !isNull(r.locRaw) ? titleCase(r.locRaw.toLowerCase()) : NA; });
+  }
+  S.recs = recs; S.quality = Q;
+  // epi window
+  const plotDates = recs.filter(r => r.date!=null && (S.opts.includeOut || !r.outWin)).map(r=>r.date);
+  S.days = [];
+  if (plotDates.length){
+    const lo = Math.min(...plotDates) - 5*DAY, hi = Math.max(...plotDates) + 5*DAY;
+    for (let t=lo; t<=hi; t+=DAY) S.days.push(t);
+  }
+  buildColorMaps();
+  $("#meta").textContent = `Source: ${S.fileName}, sheet “${S.sheet}”. ${recs.length} cases after cleaning.${S.note? " "+S.note:""}`;
+  $("#mapHint").textContent = `${S.headers.length} columns found, ${FIELDS.filter(f=>S.map[f.k]>=0).length} in use`;
+  buildFilters();
+  render();
+}
+function countBy(list, k){ const m=new Map(); list.forEach(r => m.set(r[k], (m.get(r[k])||0)+1)); return m; }
+function orderedValues(k, counts){
+  if (k==="ageGroup") return [...AGE_GROUPS, NA].filter(v => counts.has(v));
+  if (k==="facType") return FTYPE_ORDER.filter(v => counts.has(v));
+  return [...counts.keys()].sort((a,b) => (a===NA)-(b===NA) || counts.get(b)-counts.get(a) || a.localeCompare(b));
+}
+function buildColorMaps(){
+  S.colorMaps = {};
+  ["ageGroup","gender","eth","nat","loc","fac","facType"].forEach(k => {
+    const counts = countBy(S.recs,k), vals = orderedValues(k,counts), cm = {};
+    let i=0;
+    vals.forEach(v => {
+      if (v===NA){ cm[v]="#B9C3C4"; return; }
+      if (k==="gender" && GENDER_COL[v]){ cm[v]=GENDER_COL[v]; return; }
+      if (k==="facType" && FTYPE_COL[v]){ cm[v]=FTYPE_COL[v]; return; }
+      if (k==="ageGroup"){ const idx=AGE_GROUPS.indexOf(v); cm[v]=ageRamp(idx); return; }
+      cm[v]=PALETTE[i++ % PALETTE.length];
+    });
+    cm[OTHERS]="#9AA7A9";
+    S.colorMaps[k]=cm;
+  });
+}
+function ageRamp(i){ const c=["#0B4F52","#0E6F73","#1C8A85","#3FA392","#78B98F","#B5C97F","#E0C76A","#E3A650","#D08C1A","#B86B1C","#8F4F1A"];
+  if (i<0) return "#888"; const n=AGE_GROUPS.length; return n<=1 ? c[1] : c[Math.round(i*(c.length-1)/(n-1))]; }
+function setAgeScheme(k){
+  const sc = AGE_SCHEMES[k] || AGE_SCHEMES.standard; AGE_GROUPS = sc.groups; AGE_CUT = sc.cut; S.ageScheme = k;
+  S.recs.forEach(r => r.ageGroup = ageGroup(r.age));
+  S.filters.ageGroup.clear(); buildColorMaps(); buildFilters(); render();
+}
+
+/* ---------- filtering ---------- */
+function filtered(except){
+  return S.recs.filter(r => DIMS.every(d => d.k===except || !S.filters[d.k].size || S.filters[d.k].has(r[d.k])));
+}
+function anyFilter(){ return DIMS.some(d => S.filters[d.k].size); }
+function toggleFilter(k, v){
+  const f = S.filters[k]; if (f.has(v)) f.delete(v); else f.add(v);
+  render(); syncFilterUI();
+}
+
+/* ---------- filter UI ---------- */
+function buildFilters(){
+  const box = $("#fdrops"); box.innerHTML = "";
+  DIMS.forEach(d => {
+    const counts = countBy(S.recs, d.k);
+    if (counts.size<=1 && counts.has(NA)) return;
+    const w = el("div",{class:"fdrop","data-k":d.k});
+    const b = el("button",{type:"button","aria-haspopup":"true","aria-expanded":"false"}, `${esc(d.label)} <span class="val">All</span> <span aria-hidden="true">▾</span>`);
+    const pop = el("div",{class:"pop",role:"dialog","aria-label":d.label+" filter"});
+    const vals = orderedValues(d.k, counts);
+    if (vals.length>8) pop.append(el("input",{type:"search",placeholder:"Search "+d.label.toLowerCase()}));
+    const list = el("div",{class:"list"}); pop.append(list);
+    const pf = el("div",{class:"pf"}); const clr = el("button",{type:"button"},"Clear"); const only = el("button",{type:"button"},"Done");
+    pf.append(clr, only); pop.append(pf);
+    b.onclick = e => { e.stopPropagation(); const open=!w.classList.contains("open"); closeAll(); if(open){ w.classList.add("open"); b.setAttribute("aria-expanded","true"); fillList(); const s=pop.querySelector("input[type=search]"); if(s) s.focus(); } };
+    clr.onclick = () => { S.filters[d.k].clear(); render(); syncFilterUI(); fillList(); };
+    only.onclick = () => closeAll();
+    pop.onclick = e => e.stopPropagation();
+    const search = pop.querySelector("input[type=search]"); if (search) search.oninput = fillList;
+    function fillList(){
+      const q = search ? search.value.toLowerCase() : "";
+      const c2 = countBy(filtered(d.k), d.k);
+      list.innerHTML = "";
+      vals.filter(v => v.toLowerCase().includes(q)).forEach(v => {
+        const n = c2.get(v)||0;
+        const lab = el("label",{class:"opt"+(n?"":" zero")});
+        const cb = el("input",{type:"checkbox"}); cb.checked = S.filters[d.k].has(v);
+        cb.onchange = () => { toggleFilter(d.k, v); fillList(); };
+        lab.append(cb, document.createTextNode(v)); lab.append(el("span",{class:"n"}, n));
+        list.append(lab);
+      });
+    }
+    w.append(b, pop); box.append(w);
+  });
+  syncFilterUI();
+}
+function closeAll(){ document.querySelectorAll(".fdrop.open").forEach(x => { x.classList.remove("open"); x.querySelector("button").setAttribute("aria-expanded","false"); }); }
+document.addEventListener("click", closeAll);
+document.addEventListener("keydown", e => { if (e.key==="Escape") closeAll(); });
+function syncFilterUI(){
+  document.querySelectorAll(".fdrop").forEach(w => {
+    const k = w.dataset.k, f = S.filters[k], v = w.querySelector(".val");
+    w.classList.toggle("active", f.size>0);
+    v.textContent = !f.size ? "All" : f.size===1 ? [...f][0] : `${f.size} selected`;
+  });
+  $("#btnReset").disabled = !anyFilter();
+}
+$("#btnReset").onclick = () => { DIMS.forEach(d => S.filters[d.k].clear()); render(); syncFilterUI(); };
+
+/* ---------- Chart.js defaults ---------- */
+function chartDefaults(){
+  Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = "#56676C";
+  Chart.defaults.borderColor = "#E3E9E8";
+  Chart.defaults.plugins.tooltip.backgroundColor = "#14252B";
+  Chart.defaults.plugins.tooltip.padding = 10;
+  Chart.defaults.plugins.tooltip.cornerRadius = 6;
+  Chart.defaults.plugins.tooltip.titleFont = {weight:"700"};
+  Chart.defaults.animation.duration = 250;
+}
+const totalsPlugin = {
+  id:"totals",
+  afterDatasetsDraw(chart, _a, opts){
+    if (!opts || !opts.show) return;
+    const {ctx} = chart; const tot = opts.values; const meta = chart.getDatasetMeta(opts.topIndex ?? chart.data.datasets.length-1);
+    ctx.save(); ctx.font = "700 11px "+Chart.defaults.font.family; ctx.fillStyle = "#14252B"; ctx.textAlign="center"; ctx.textBaseline="bottom";
+    const yScale = chart.scales.y;
+    chart.getDatasetMeta(opts.refIndex).data.forEach((bar,i) => { if (!tot[i]) return; ctx.fillText(tot[i], bar.x, yScale.getPixelForValue(tot[i]) - 3); });
+    ctx.restore();
+  }
+};
+function upsert(id, cfg){
+  if (S.charts[id]){ S.charts[id].destroy(); }
+  S.charts[id] = new Chart(document.getElementById(id), cfg);
+  return S.charts[id];
+}
+
+/* ---------- render ---------- */
+function render(){
+  const all = filtered(null);
+  $("#fcount").innerHTML = anyFilter() ? `Showing <b>${all.length}</b> of ${S.recs.length} cases` : `${S.recs.length} cases`;
+  renderStats(all);
+  renderEpi(all);
+  renderPyramid();
+  renderAgeBox(all);
+  renderAgeTable();
+  renderPBar("pGender","gender","Gender");
+  renderPBar("pNat","nat","Nationality");
+  renderHBar("cEth","eth", 12, "ethNote");
+  renderHBar("cLoc","loc", 15, "locNote");
+  renderHBar("cFac","fac", 15, null);
+  renderFType();
+  renderHeatmap(all);
+  renderQuality();
+}
+function inPlot(r){ return r.date!=null && (S.opts.includeOut || !r.outWin); }
+function renderStats(list){
+  const dated = list.filter(inPlot).map(r=>r.date);
+  const byDay = new Map(); dated.forEach(d => byDay.set(d,(byDay.get(d)||0)+1));
+  let peak=null, pn=0; byDay.forEach((n,d)=>{ if(n>pn || (n===pn && d<peak)){pn=n;peak=d;} });
+  const ages = list.map(r=>r.age).filter(a=>a!=null).sort((a,b)=>a-b);
+  const med = ages.length ? quant(ages,.5) : null;
+  const g = countBy(list,"gender"); const gk = (g.get("Male")||0)+(g.get("Female")||0);
+  const facs = new Set(list.map(r=>r.fac).filter(f=>f!==NA)).size;
+  const items = [
+    {v:list.length, k: anyFilter()? "cases (filtered)":"cases", hero:true},
+    {v: dated.length? fmtD(Math.min(...dated)) : "–", k:"first case"},
+    {v: dated.length? fmtD(Math.max(...dated)) : "–", k:"latest case"},
+    {v: peak!=null ? `${fmtD(peak)} <small>${pn} cases</small>` : "–", k:"peak day"},
+    {v: med!=null ? `${fmtAge(med)} <small>years</small>` : "–", k:"median age"},
+    {v: gk ? `${pct(g.get("Female")||0,gk)}<small>%</small>` : "–", k:"female, where stated"},
+    {v: facs, k:"reporting facilities"}
+  ];
+  $("#stats").innerHTML = items.map(i => `<div class="stat${i.hero?" hero":""}"><div class="v">${i.v}</div><div class="k">${i.k}</div></div>`).join("");
+}
+function quant(sorted,q){ const p=(sorted.length-1)*q, lo=Math.floor(p), hi=Math.ceil(p); return sorted[lo]+(sorted[hi]-sorted[lo])*(p-lo); }
+
+function topN(k, list, n){
+  const c = countBy(list,k); const vals = orderedValues(k,c).filter(v=>v!==NA);
+  const keep = new Set(vals.slice(0,n)); return keep;
+}
+function renderEpi(list){
+  const days = S.days; const idx = new Map(days.map((d,i)=>[d,i]));
+  const dateHdr = S.map.date>=0 ? S.headers[S.map.date] : "date";
+  $("#epiSub").textContent = days.length ? `Daily cases by “${dateHdr}”, ${fmtD(days[0])} to ${fmtD(days[days.length-1],{day:"numeric",month:"short",year:"numeric"})} (5 days either side of the first and last case)` : "No usable dates in the selected column";
+  const k = S.stackBy; const plot = list.filter(inPlot);
+  const datasets = [];
+  const totals = new Array(days.length).fill(0);
+  plot.forEach(r => { const i=idx.get(r.date); if(i!=null) totals[i]++; });
+  if (k==="none"){
+    datasets.push({label:"Cases", data:totals, backgroundColor:"#0E6F73", hoverBackgroundColor:"#0A5558", stack:"s", borderColor:"#fff", borderWidth:{top:0,left:1,right:1,bottom:0}});
+  } else {
+    let keep = null;
+    if (["eth","loc","fac"].includes(k)) keep = topN(k, S.recs, 8);
+    const groups = new Map();
+    plot.forEach(r => { let g=r[k]; if (keep && g!==NA && !keep.has(g)) g=OTHERS; if(!groups.has(g)) groups.set(g,new Array(days.length).fill(0)); const i=idx.get(r.date); if(i!=null) groups.get(g)[i]++; });
+    const counts = countBy(S.recs,k);
+    let order = orderedValues(k,counts).filter(v => groups.has(v));
+    if (groups.has(OTHERS)) order = order.filter(v=>v!==NA).concat([OTHERS]).concat(groups.has(NA)?[NA]:[]);
+    order.forEach(g => datasets.push({label:g, data:groups.get(g), backgroundColor:S.colorMaps[k][g]||"#9AA7A9", stack:"s", borderColor:"#fff", borderWidth:{top:0,left:1,right:1,bottom:0}}));
+  }
+  const refIndex = datasets.length-1;
+  if (anyFilter()){
+    const allTot = new Array(days.length).fill(0);
+    S.recs.filter(inPlot).forEach(r => { const i=idx.get(r.date); if(i!=null) allTot[i]++; });
+    datasets.push({label:"All cases (unfiltered)", data:allTot, backgroundColor:"#E1E7E6", stack:"ghost", xAxisID:"xg", order:99, borderColor:"#fff", borderWidth:{top:0,left:1,right:1,bottom:0}});
+  }
+  const labels = days.map(d => [fmtD(d), new Date(d).toLocaleDateString("en-GB",{timeZone:"UTC",weekday:"short"})]);
+  const many = days.length>45;
+  upsert("cEpi", {
+    type:"bar",
+    data:{labels, datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:{duration:200},
+      datasets:{bar:{categoryPercentage:1, barPercentage:1}},
+      layout:{padding:{top:18}},
+      interaction:{mode:"index", intersect:false},
+      scales:{
+        x:{stacked:true, grid:{display:false}, ticks:{maxRotation:0, autoSkip:many, autoSkipPadding:10, font:{size:11}, color:"#3C4E54",
+            callback:(v,i)=> many ? labels[i][0] : labels[i]}, title:{display:true, text:dateHdr, color:"#66777C", font:{size:12}}},
+        xg:{display:false, stacked:true, offset:true, grid:{display:false}},
+        y:{stacked:true, beginAtZero:true, ticks:{precision:0}, title:{display:true, text:"Number of cases", color:"#66777C"}, grid:{color:"#E8EEED"}}
+      },
+      plugins:{
+        legend:{display: k!=="none" || anyFilter(), position:"top", align:"start", labels:{boxWidth:12, boxHeight:12, usePointStyle:false, padding:14,
+          filter: it => !(k==="none" && it.text==="Cases")}},
+        tooltip:{ filter: it => it.raw>0 || it.dataset.stack!=="ghost",
+          callbacks:{ title: items => fmtFull(days[items[0].dataIndex]),
+            footer: items => { const i=items[0].dataIndex; return k!=="none" ? `Total: ${totals[i]}` : ""; } },
+          itemSort:(a,b)=> (a.dataset.stack==="ghost") - (b.dataset.stack==="ghost") },
+        totals:{show:true, values:totals, refIndex}
+      },
+      onClick:(e, els) => {}
+    },
+    plugins:[totalsPlugin]
+  });
+  const undated = list.filter(r => r.date==null).length, out = list.filter(r=>r.date!=null && r.outWin && !S.opts.includeOut).length;
+  const notes = [];
+  if (undated) notes.push(`${undated} case${undated>1?"s":""} with no usable date ${undated>1?"are":"is"} not plotted.`);
+  if (out) notes.push(`${out} case${out>1?"s":""} dated more than 4 weeks from the outbreak median ${out>1?"are":"is"} left out (see data quality).`);
+  if (S.quality.yearFixed.length) notes.push(`${S.quality.yearFixed.length} dates had an impossible year and were corrected.`);
+  if (anyFilter()) notes.push("Grey bars show all cases before filtering.");
+  $("#epiFoot").innerHTML = notes.map(n=>`<span>${n}</span>`).join("");
+}
+function renderPyramid(){
+  const list = filtered("ageGroup");
+  const sel = S.filters.ageGroup;
+  const groups = [...AGE_GROUPS].reverse();
+  const male = groups.map(g => list.filter(r=>r.ageGroup===g && r.gender==="Male").length);
+  const fem  = groups.map(g => list.filter(r=>r.ageGroup===g && r.gender==="Female").length);
+  const mx = Math.max(1,...male,...fem);
+  const noAge = list.filter(r=>r.ageGroup===NA).length, noSex = list.filter(r=>r.ageGroup!==NA && r.gender!=="Male" && r.gender!=="Female").length;
+  $("#pyrNote").textContent = `Males left, females right. ${noAge? noAge+" without age":""}${noAge&&noSex?" and ":""}${noSex? noSex+" without gender":""}${noAge||noSex?" not shown.":""}`;
+  const mute = (c, g) => (!sel.size || sel.has(g)) ? c : hexA(c,.25);
+  upsert("cPyr", {
+    type:"bar",
+    data:{labels:groups, datasets:[
+      {label:"Male", data:male.map(v=>-v), backgroundColor:groups.map(g=>mute(GENDER_COL.Male,g)), borderRadius:3, barPercentage:.86, categoryPercentage:.9},
+      {label:"Female", data:fem, backgroundColor:groups.map(g=>mute(GENDER_COL.Female,g)), borderRadius:3, barPercentage:.86, categoryPercentage:.9}
+    ]},
+    options:{indexAxis:"y", responsive:true, maintainAspectRatio:false,
+      scales:{x:{stacked:true, min:-niceMax(mx), max:niceMax(mx), ticks:{precision:0, callback:v=>Number.isInteger(v)?Math.abs(v):""}, grid:{color:"#E8EEED"}},
+              y:{stacked:true, grid:{display:false}, ticks:{color:"#3C4E54", font:{weight:"600"}}}},
+      plugins:{legend:{position:"top", align:"start", labels:{boxWidth:12,boxHeight:12}},
+        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${Math.abs(c.raw)}`, title:i=>`Age ${i[0].label}`}}},
+      onClick:(e,els)=>{ if(els.length) toggleFilter("ageGroup", groups[els[0].index]); },
+      onHover:(e,els)=>{ e.native.target.style.cursor = els.length?"pointer":"default"; }
+    }
+  });
+}
+function niceMax(m){ const step = m<=10?2:m<=25?5:m<=60?10:m<=150?25:50; return Math.ceil((m+0.5)/step)*step; }
+function renderAgeBox(list){
+  const a = list.map(r=>r.age).filter(x=>x!=null).sort((x,y)=>x-y);
+  const box = $("#ageBox");
+  if (!a.length){ box.innerHTML = `<div><b>–</b><span>median</span></div><div><b>–</b><span>middle half</span></div><div><b>–</b><span>range</span></div>`; return; }
+  box.innerHTML = `<div><b>${fmtAge(quant(a,.5))}</b><span>median</span></div>
+    <div><b>${fmtAge(quant(a,.25))}–${fmtAge(quant(a,.75))}</b><span>middle half (IQR)</span></div>
+    <div><b>${fmtAge(a[0])}–${fmtAge(a[a.length-1])}</b><span>youngest to oldest</span></div>`;
+}
+function renderAgeTable(){
+  const list = filtered("ageGroup"), c = countBy(list,"ageGroup"), sel = S.filters.ageGroup, tot = list.length;
+  const groups = [...AGE_GROUPS, NA].filter(g => g!==NA || c.get(NA));
+  const mx = Math.max(1, ...AGE_GROUPS.map(g => c.get(g)||0));
+  let h = `<thead><tr><th>Age group</th><th></th><th>Cases</th><th>%</th></tr></thead><tbody>`;
+  groups.forEach(g => {
+    const n = c.get(g)||0, col = g===NA ? "#B9C3C4" : ageRamp(AGE_GROUPS.indexOf(g));
+    h += `<tr class="row${g===NA?" na":""}${sel.size && !sel.has(g)?" muted":""}" data-g="${esc(g)}" tabindex="0">
+      <td class="g">${esc(g)}</td><td class="b"><span style="width:${(n/mx*100).toFixed(1)}%;background:${col}"></span></td>
+      <td class="n">${n}</td><td class="p">${pct(n,tot).toFixed(1)}%</td></tr>`;
+  });
+  h += `<tr class="tot"><td class="g">Total</td><td></td><td class="n">${tot}</td><td class="p">100%</td></tr></tbody>`;
+  const t = $("#ageTbl"); t.innerHTML = h;
+  t.querySelectorAll("tr.row").forEach(tr => {
+    tr.onclick = () => toggleFilter("ageGroup", tr.dataset.g);
+    tr.onkeydown = e => { if (e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleFilter("ageGroup", tr.dataset.g); } };
+  });
+}
+function renderPBar(id, k, title){
+  const list = filtered(k), c = countBy(list,k), vals = orderedValues(k,c), tot = list.length, sel = S.filters[k];
+  const w = $("#"+id);
+  const known = vals.filter(v=>v!==NA).reduce((s,v)=>s+c.get(v),0);
+  w.innerHTML = `<div class="pt"><span>${title}</span><span style="color:var(--muted);font-weight:500">${known} of ${tot} stated</span></div>`;
+  const bar = el("div",{class:"pbar",role:"group","aria-label":title});
+  vals.forEach(v => {
+    const n=c.get(v), p=pct(n,tot);
+    const s = el("button",{class:"seg"+(sel.size && !sel.has(v)?" muted":""), type:"button", title:`${v}: ${n} (${p}%)`, style:`flex:${n};background:${S.colorMaps[k][v]||"#999"}`}, p>=9 ? `${p}%` : "");
+    s.onclick = () => toggleFilter(k,v);
+    bar.append(s);
+  });
+  w.append(bar);
+  const leg = el("div",{class:"pleg"});
+  leg.innerHTML = vals.map(v => `<span><i style="background:${S.colorMaps[k][v]}"></i>${esc(v)} <b>${c.get(v)}</b></span>`).join("");
+  w.append(leg);
+}
+function renderHBar(id, k, n, noteId){
+  const list = filtered(k), c = countBy(list,k), sel = S.filters[k];
+  let vals = orderedValues(k,c).filter(v=>v!==NA);
+  const na = c.get(NA)||0;
+  const shown = vals.slice(0,n); const rest = vals.slice(n); const restN = rest.reduce((s,v)=>s+c.get(v),0);
+  const labels = [...shown]; const data = shown.map(v=>c.get(v));
+  if (restN && k!=="loc"){ labels.push(`${rest.length} others`); data.push(restN); }
+  const colFor = v => k==="fac" ? (FTYPE_COL[facTypeOf(v)]||"#5C6F9E") : "#0E6F73";
+  const colors = labels.map((v,i) => { const base = i<shown.length ? colFor(v) : "#9AA7A9"; return (!sel.size || sel.has(v)) ? base : hexA(base,.22); });
+  if (noteId){
+    const distinct = vals.length;
+    $("#"+noteId).textContent = `${distinct} ${k==="loc"?"localities":"groups"}${restN? `, top ${n} shown${k==="loc"?` (${restN} cases live elsewhere; use the Locality filter to find them)`:""}`:""}${na? `. ${na} not stated.`:"."}${k==="loc" && S.opts.harm && S.quality.locMerged>0 ? ` ${S.quality.locMerged} spelling variants merged.`:""}`;
+  } else if (k==="fac"){
+    $("#facNote").textContent = `${vals.length} facilities named${na?`, ${na} cases with no facility recorded`:""}. Bars are coloured by facility type.`;
+  }
+  const h = Math.max(220, labels.length*26 + 40);
+  document.getElementById(id).parentElement.style.height = h+"px";
+  upsert(id, {
+    type:"bar",
+    data:{labels, datasets:[{data, backgroundColor:colors, borderRadius:3, barPercentage:.82, categoryPercentage:.9}]},
+    options:{indexAxis:"y", responsive:true, maintainAspectRatio:false, layout:{padding:{right:30}},
+      scales:{x:{beginAtZero:true, ticks:{precision:0}, grid:{color:"#E8EEED"}}, y:{grid:{display:false}, ticks:{color:"#14252B", autoSkip:false,
+        callback:function(v){ const s=this.getLabelForValue(v); return s.length>34 ? s.slice(0,33)+"…" : s; }}}},
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>`${c.raw} cases (${pct(c.raw,list.length)}% of ${list.length})`}},
+        totals:{show:true, horizontal:true}},
+      onClick:(e,els)=>{ if(!els.length) return; const i=els[0].index; if (i<shown.length) toggleFilter(k, shown[i]); },
+      onHover:(e,els)=>{ e.native.target.style.cursor = (els.length && els[0].index<shown.length)?"pointer":"default"; }
+    },
+    plugins:[hLabels]
+  });
+}
+const hLabels = { id:"hLabels", afterDatasetsDraw(chart){ const {ctx}=chart; const meta=chart.getDatasetMeta(0); ctx.save(); ctx.font="700 11px "+Chart.defaults.font.family; ctx.fillStyle="#14252B"; ctx.textBaseline="middle";
+  meta.data.forEach((b,i)=>{ const v=chart.data.datasets[0].data[i]; if(v) ctx.fillText(v, b.x+5, b.y); }); ctx.restore(); } };
+function facTypeOf(name){ const r = S.recs.find(x=>x.fac===name); return r ? r.facType : "Other or unclear"; }
+function renderFType(){
+  const list = filtered("facType"), c = countBy(list,"facType"), vals = orderedValues("facType",c), sel = S.filters.facType, tot=list.length;
+  const ul = $("#fType"); ul.innerHTML = "";
+  vals.forEach(v => {
+    const n=c.get(v), col = FTYPE_COL[v]||"#B9C3C4";
+    const li = el("li",{class: sel.size && !sel.has(v) ? "muted":"", tabindex:"0", role:"button"});
+    li.innerHTML = `<span class="nm"><i style="background:${col}"></i>${esc(v)}</span><span class="ct">${n}<small>${pct(n,tot)}%</small></span><span class="tr"><b style="width:${pct(n,tot)}%;background:${col}"></b></span>`;
+    li.onclick = () => toggleFilter("facType", v);
+    li.onkeydown = e => { if (e.key==="Enter"||e.key===" "){ e.preventDefault(); toggleFilter("facType", v); } };
+    ul.append(li);
+  });
+}
+function renderHeatmap(list){
+  const days = S.days, t = $("#hm");
+  if (!days.length){ t.innerHTML = "<tr><td>No dated cases.</td></tr>"; return; }
+  const idx = new Map(days.map((d,i)=>[d,i]));
+  const facs = new Map();
+  list.forEach(r => { if(!facs.has(r.fac)) facs.set(r.fac,{cells:new Array(days.length).fill(0), tot:0, nd:0, type:r.facType}); const f=facs.get(r.fac); f.tot++;
+    if (inPlot(r)){ const i=idx.get(r.date); if(i!=null) f.cells[i]++; } else f.nd++; });
+  const rows = [...facs.entries()].sort((a,b)=> (a[0]===NA)-(b[0]===NA) || b[1].tot-a[1].tot);
+  // trim leading/trailing empty days of padding for the grid? keep full window for alignment with the curve
+  let mx = 1; rows.forEach(([,f])=> f.cells.forEach(v=>{ if(v>mx) mx=v; }));
+  const anyND = rows.some(([,f])=>f.nd);
+  let h = `<thead><tr><th class="fac">Facility</th><th>Total</th>${days.map(d=>`<th class="d">${fmtD(d)}</th>`).join("")}${anyND?'<th class="d">No date</th>':""}</tr></thead><tbody>`;
+  rows.forEach(([name,f]) => {
+    h += `<tr><td class="fac" title="${esc(name)}">${esc(name)}</td><td class="tot">${f.tot}</td>`;
+    f.cells.forEach(v => {
+      if (!v){ h += `<td class="c" style="background:#F3F6F5"></td>`; return; }
+      const a = .18 + .82*(v/mx); const txt = a>.55 ? "#fff" : "#0A3F42";
+      h += `<td class="c" style="background:${hexA("#0E6F73",a)};color:${txt}" title="${esc(name)}, ${fmtD(days[f.cells.indexOf(v)])}: ${v}">${v}</td>`;
+    });
+    if (anyND) h += `<td class="c nd">${f.nd||""}</td>`;
+    h += `</tr>`;
+  });
+  t.innerHTML = h + "</tbody>";
+  // correct per-cell titles (indexOf above picks first match) – rebuild titles
+  t.querySelectorAll("tbody tr").forEach((tr,ri) => { tr.querySelectorAll("td.c").forEach((td,ci) => { if (ci<days.length && td.textContent) td.title = `${rows[ri][0]}, ${fmtFull(days[ci])}: ${td.textContent} case${td.textContent==="1"?"":"s"}`; }); });
+}
+function renderQuality(){
+  const Q = S.quality, R = S.recs;
+  const miss = k => R.filter(r=>r[k]===NA).length;
+  const hint = [];
+  if (Q.merged) hint.push(`${Q.merged} repeat entries merged`);
+  if (S.map.name<0 && S.map.ic<0) hint.push("no name or IC column, so repeat entries cannot be checked");
+  if (Q.yearFixed.length) hint.push(`${Q.yearFixed.length} dates corrected`);
+  if (Q.outWindow.length) hint.push(`${Q.outWindow.length} dates out of window`);
+  $("#dqHint").textContent = hint.length ? hint.join(", ") : "No issues needing attention";
+  const fld = [["Date",R.filter(r=>r.date==null).length],["Age",miss("ageGroup")],["Gender",miss("gender")],["Ethnicity",miss("eth")],["Nationality",miss("nat")],["Locality",miss("loc")],["Facility",miss("fac")]];
+  const col = k => S.map[k]>=0;
+  const fldRows = fld.map(([n,v],i) => { const key=["date","age","gender","eth","nat","loc","fac"][i]; return `<tr><td>${n}</td><td class="r">${col(key)? v : "column not set"}</td><td class="r">${col(key)? pct(v,R.length)+"%" : ""}</td></tr>`; }).join("");
+  const list = (arr, f) => arr.length ? arr.slice(0,200).map(f).join("") : `<tr><td colspan="2" style="color:var(--muted)">None</td></tr>`;
+  $("#dqBody").innerHTML = `
+    <div>
+      <h4>Records</h4>
+      <table class="simple"><tbody>
+        <tr><td>Rows with data</td><td class="r">${Q.read}</td></tr>
+        <tr><td>Repeat entries merged into an existing case</td><td class="r">${S.opts.dedup? Q.merged : "off"}</td></tr>
+        <tr><td>People who appeared more than once</td><td class="r">${S.opts.dedup? Q.groups : "off"}</td></tr>
+        <tr><td><b>Cases analysed</b></td><td class="r"><b>${R.length}</b></td></tr>
+      </tbody></table>
+      <h4 style="margin-top:18px">Repeat entries merged (spreadsheet row numbers)</h4>
+      <div class="dq-scroll"><table class="simple"><thead><tr><th>Kept row</th><th>Merged into it</th><th>Matched on</th></tr></thead><tbody>${S.opts.dedup ? list(Q.dupGroups, g=>`<tr><td>${g.keep}</td><td>${g.rows.join(", ")}</td><td>${g.how}</td></tr>`) : `<tr><td colspan="3" style="color:var(--muted)">Merging is switched off</td></tr>`}</tbody></table></div>
+      <p style="font-size:12.5px;color:var(--muted);margin:6px 0 0">Blank fields in the kept row are filled from the merged rows.</p>
+      <h4 style="margin-top:18px">Missing values by field</h4>
+      <table class="simple"><thead><tr><th>Field</th><th class="r">Missing</th><th class="r">Share</th></tr></thead><tbody>${fldRows}</tbody></table>
+      <h4 style="margin-top:18px">Ages that could not be read</h4>
+      <div class="dq-scroll"><table class="simple"><tbody>${list(Q.ageInvalid, a=>`<tr><td>${esc(a)}</td></tr>`)}</tbody></table></div>
+    </div>
+    <div>
+      <h4>Dates with a year typo, corrected to the reporting year</h4>
+      <div class="dq-scroll"><table class="simple"><thead><tr><th>As entered</th><th>Used as</th></tr></thead><tbody>${list(Q.yearFixed, x=>`<tr><td>${esc(x.raw)}</td><td>${x.to}</td></tr>`)}</tbody></table></div>
+      <h4 style="margin-top:18px">Dates more than 4 weeks from the outbreak median ${S.opts.includeOut? "(included by your setting)":"(left out of the curve)"}</h4>
+      <div class="dq-scroll"><table class="simple"><thead><tr><th>As entered</th><th>Read as</th></tr></thead><tbody>${list(Q.outWindow, x=>`<tr><td>${esc(x.raw)}</td><td>${x.d}</td></tr>`)}</tbody></table></div>
+      <h4 style="margin-top:18px">Date entries that are not dates</h4>
+      <div class="dq-scroll"><table class="simple"><tbody>${list(Q.dateInvalid, a=>`<tr><td>${esc(a)}</td></tr>`)}</tbody></table></div>
+      ${Q.noYear? `<p style="font-size:13px;color:var(--muted)">${Q.noYear} dates were entered without a year; the reporting year was assumed.</p>`:""}
+    </div>`;
+}
+
+/* ---------- export ---------- */
+function exportCSV(){
+  const cols = [["date","Date"],["ageYears","Age (years)"],["ageGroup","Age group"],["gender","Gender"],["eth","Ethnicity"],["nat","Nationality"],["loc","Locality (harmonised)"],["locRaw","Locality as entered"],["fac","Facility"],["facType","Facility type"],["flag","Date note"]];
+  const q = v => { const s = v==null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
+  const rows = filtered(null).map(r => ({...r, date: r.date!=null ? new Date(r.date).toISOString().slice(0,10) : "", ageYears: r.age!=null ? Math.round(r.age*100)/100 : "", flag: r.outWin ? "outside window" : (r.dflag||"")}));
+  const csv = [cols.map(c=>q(c[1])).join(",")].concat(rows.map(r => cols.map(c=>q(r[c[0]])).join(","))).join("\n");
+  const blob = new Blob(["\ufeff"+csv], {type:"text/csv"});
+  const a = el("a",{href:URL.createObjectURL(blob), download:(S.fileName.replace(/\.[^.]+$/,"")||"cases")+"_cleaned.csv"}); document.body.append(a); a.click(); a.remove();
+}
+function savePng(){
+  const c = S.charts.cEpi; if (!c) return;
+  const src = c.canvas, out = document.createElement("canvas"); const pad = 60*devicePixelRatio;
+  out.width = src.width; out.height = src.height + pad; const x = out.getContext("2d");
+  x.fillStyle="#fff"; x.fillRect(0,0,out.width,out.height);
+  x.fillStyle="#14252B"; x.font = `700 ${18*devicePixelRatio}px ${Chart.defaults.font.family}`; x.fillText($("#title").value+" — epidemic curve", 12*devicePixelRatio, 30*devicePixelRatio);
+  x.fillStyle="#66777C"; x.font = `${12*devicePixelRatio}px ${Chart.defaults.font.family}`; x.fillText($("#epiSub").textContent, 12*devicePixelRatio, 50*devicePixelRatio);
+  x.drawImage(src, 0, pad);
+  const a = el("a",{href:out.toDataURL("image/png"), download:"epicurve.png"}); document.body.append(a); a.click(); a.remove();
+}
+
+/* ---------- wiring ---------- */
+function openPicker(){ $("#file").value=""; $("#file").click(); }
+$("#btnUpload").onclick = openPicker; $("#btnUpload2").onclick = openPicker;
+$("#file").onchange = e => { if (e.target.files[0]) readFile(e.target.files[0]); };
+$("#btnExport").onclick = exportCSV; $("#btnPng").onclick = savePng;
+$("#stackBy").onchange = e => { S.stackBy = e.target.value; renderEpi(filtered(null)); };
+$("#optDedup").onchange = e => { S.opts.dedup = e.target.checked; process(); };
+$("#optHarm").onchange = e => { S.opts.harm = e.target.checked; S.filters.loc.clear(); process(); };
+$("#ageScheme").onchange = e => setAgeScheme(e.target.value);
+$("#optOut").onchange = e => { S.opts.includeOut = e.target.checked; process(); };
+$("#title").oninput = e => { document.title = e.target.value || "Outbreak case dashboard"; };
+const drop = $("#drop");
+["dragenter","dragover"].forEach(ev => window.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave","drop"].forEach(ev => window.addEventListener(ev, e => { e.preventDefault(); if (ev==="dragleave" && e.relatedTarget) return; drop.classList.remove("over"); }));
+window.addEventListener("drop", e => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) readFile(f); });
+const fbar = $("#fbar");
+new IntersectionObserver(([en]) => fbar.classList.toggle("stuck", en.intersectionRatio<1), {threshold:[1], rootMargin:"-1px 0px 0px 0px"}).observe(fbar);
+if (typeof Chart !== "undefined") chartDefaults();
+window.__dash = {S, readFile, process};
+/* Embedded data: if the page carries a data block, load it on open. Uploading a file still replaces it. */
+const emb = document.getElementById("embedded-data");
+if (emb && typeof XLSX !== "undefined"){
+  try{
+    const d = JSON.parse(emb.textContent);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([d.headers, ...d.rows]), d.sheet || "Data");
+    S.wb = wb; S.fileName = d.fileName || "embedded data"; S.note = d.note || "";
+    if (d.title) $("#title").value = d.title;
+    document.title = $("#title").value;
+    loadSheet(wb.SheetNames[0]);
+  }catch(ex){ console.error("Embedded data could not be read", ex); }
+}
+})();
+</script>
+</body>
+</html>

@@ -737,6 +737,19 @@ function chartDefaults(){
   Chart.defaults.animation.duration = 250;
   Chart.defaults.plugins.tooltip.animation = false;
   if (!Chart.registry.plugins.get("tipGuard")) Chart.register(tipGuardPlugin);
+  /* "day" interaction: the bars of the day directly under the pointer. The built-in "index" mode skips
+     zero-height bars, so over an empty day it kept showing the neighbouring day's tooltip. */
+  Chart.Interaction.modes.day = function(chart, e){
+    const pos = Chart.helpers.getRelativePosition(e, chart), a = chart.chartArea;
+    if (pos.x < a.left || pos.x > a.right || pos.y < a.top || pos.y > a.bottom) return [];
+    const i = Math.round(chart.scales.x.getValueForPixel(pos.x)), items = [];
+    chart.data.datasets.forEach((ds, di) => {
+      if (!chart.isDatasetVisible(di)) return;
+      const el = chart.getDatasetMeta(di).data[i];
+      if (el && +ds.data[i] > 0) items.push({element:el, datasetIndex:di, index:i});
+    });
+    return items;
+  };
 }
 const totalsPlugin = {
   id:"totals",
@@ -837,7 +850,8 @@ const tipGuardPlugin = {
   id:"tipGuard",
   afterEvent(chart, args){
     const e = args.event, a = chart.chartArea;
-    if (e.type==="mouseout" || (a && (e.x < a.left || e.x > a.right || e.y < a.top || e.y > a.bottom))){
+    let off = e.type==="mouseout" || (a && (e.x < a.left || e.x > a.right || e.y < a.top || e.y > a.bottom));
+    if (off){
       if (chart.tooltip && chart.tooltip.getActiveElements().length){
         chart.tooltip.setActiveElements([], {x:0, y:0}); chart.setActiveElements([]); args.changed = true;
       }
@@ -898,7 +912,7 @@ function renderEpi(list){
       responsive:true, maintainAspectRatio:false, animation:{duration:200},
       datasets:{bar:{categoryPercentage:1, barPercentage:1}},
       layout:{padding:{top:18, right:4}},
-      interaction:{mode:"index", intersect:false},
+      interaction:{mode:"day", intersect:false},
       scales:{
         x:{stacked:true, grid:{display:false}, ticks: narrow
               ? {maxRotation:0, minRotation:0, autoSkip:false, font:{size:11}, color:"#3A4F55", callback:(v,i)=> dayLbl(i)}

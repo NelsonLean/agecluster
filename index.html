@@ -203,6 +203,40 @@ table.hm td.nd{color:var(--muted);text-align:center}
   #rLoc ol.rank li{break-inside:avoid}
   #rLoc ol.rank li .rk{border-bottom:1px solid var(--line-2)}
 }
+.pf-row .sec:first-child{margin-top:26px}
+
+/* ---------- Large monitors: use the full width ---------- */
+@media (min-width:1400px){
+  .wrap{max-width:2200px;padding:0 40px}
+  .top .wrap{max-width:1180px;padding:0 24px}   /* banner stays centred at its original width */
+  .top{padding:30px 0 26px}
+  .hero b{font-size:104px}
+  .fig dd{font-size:26px}
+  .fig dt{font-size:13px}
+  .epi-canvas{height:480px}
+  .pf-row .sec,.pf-row .sec:first-child{margin-top:0}
+  .grid{gap:16px}
+  #rLoc ol.rank{columns:1}
+  table.hm{width:100%}
+  table.hm td.c{width:auto;height:32px;font-size:12px}
+}
+@media (min-width:1400px){
+  /* People: pyramid | age table | gender + ethnicity stacked */
+  .g4{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:"pyr age gn" "pyr age eth"}
+  .c-pyr{grid-area:pyr} .c-age{grid-area:age} .c-gn{grid-area:gn} .c-eth{grid-area:eth}
+  /* Places + facilities: locality | type over day grid | reporting facility */
+  .pf-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:20px;row-gap:16px;
+    grid-template-areas:"hp hf hf" "loc type fac" "loc heat fac";grid-template-rows:auto auto 1fr;margin-top:26px}
+  .pf-row .sec,#sFac .grid{display:contents}
+  .h-places{grid-area:hp;margin:0!important} .h-fac{grid-area:hf;margin:0!important}
+  .c-loc{grid-area:loc} .c-type{grid-area:type} .c-fac{grid-area:fac} .pf-row .card.c-heat{grid-area:heat}
+  /* cards whose lists scroll to fill whatever height the row gives them */
+  .c-loc,.c-fac,.c-eth{display:flex;flex-direction:column;min-height:0}
+  .fit{flex:1 1 0;min-height:220px;overflow-y:auto;margin-right:-8px;padding-right:8px;scrollbar-width:thin}
+  .c-heat .hm-wrap{overflow-x:auto}
+  table.hm td.fac .fn{width:clamp(110px,8vw,240px)}
+  table.hm td.c{min-width:24px}
+}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
@@ -251,13 +285,13 @@ table.hm td.nd{color:var(--muted);text-align:center}
 
   <section class="sec" id="sPeople" aria-labelledby="peopleTitle">
     <h2 id="peopleTitle">Who is affected</h2>
-    <div class="grid g2">
-      <div class="card fill">
+    <div class="grid g2 g4">
+      <div class="card c-pyr fill">
         <h3>Age and gender</h3>
         <div class="cn" id="pyrNote"></div>
         <div class="ch"><canvas id="cPyr"></canvas></div>
       </div>
-      <div class="card">
+      <div class="card c-age">
         <h3>Age</h3>
         <div class="cn">Years, among cases with a recorded age. Tap a row to filter.</div>
         <div class="agebox" id="ageBox"></div>
@@ -270,50 +304,53 @@ table.hm td.nd{color:var(--muted);text-align:center}
         </div>
         <table class="agetbl" id="ageTbl"></table>
       </div>
-      <div class="card">
+      <div class="card c-gn">
         <h3>Gender and nationality</h3>
         <div class="cn">Tap a segment to filter.</div>
         <div class="pbar-wrap" id="pGender"></div>
         <div class="pbar-wrap" id="pNat"></div>
       </div>
-      <div class="card">
+      <div class="card c-eth">
         <h3>Ethnicity</h3>
         <div class="cn" id="rEthNote"></div>
-        <div id="rEth"></div>
+        <div id="rEth" class="fit"></div>
       </div>
     </div>
   </section>
 
+  <div class="pf-row">
   <section class="sec" id="sPlaces" aria-labelledby="placesTitle">
-    <h2 id="placesTitle">Where cases live</h2>
-    <div class="card">
+    <h2 id="placesTitle" class="h-places">Where cases live</h2>
+    <div class="card c-loc">
       <h3>Locality</h3>
       <div class="cn" id="rLocNote"></div>
-      <div id="rLoc"></div>
+      <div id="rLoc" class="fit"></div>
     </div>
   </section>
 
   <section class="sec" id="sFac" aria-labelledby="facTitle">
-    <h2 id="facTitle">Where cases were seen</h2>
+    <h2 id="facTitle" class="h-fac">Where cases were seen</h2>
     <div class="grid g2">
-      <div class="card">
+      <div class="card c-type">
         <h3>Facility type</h3>
         <div class="cn">Grouped from the facility name. Tap to filter.</div>
         <div id="rType"></div>
       </div>
-      <div class="card">
+      <div class="card c-fac">
         <h3>Reporting facility</h3>
         <div class="cn" id="rFacNote"></div>
         <div class="type-key" id="typeKey"></div>
-        <div id="rFac"></div>
+        <div id="rFac" class="fit"></div>
       </div>
-      <div class="card span2">
+      <div class="card c-heat span2">
         <h3>Cases by facility and day</h3>
         <div class="cn">Shows which facilities picked up cases first. Swipe sideways for more days.</div>
         <div class="hm-wrap" id="hmWrap"><table class="hm" id="hm"></table></div>
       </div>
     </div>
   </section>
+
+  </div>
 
   <footer class="foot">
     <p id="meta"></p>
@@ -698,6 +735,8 @@ function chartDefaults(){
   Chart.defaults.plugins.tooltip.cornerRadius = 8;
   Chart.defaults.plugins.tooltip.titleFont = {weight:"700"};
   Chart.defaults.animation.duration = 250;
+  Chart.defaults.plugins.tooltip.animation = false;
+  if (!Chart.registry.plugins.get("tipGuard")) Chart.register(tipGuardPlugin);
 }
 const totalsPlugin = {
   id:"totals",
@@ -714,6 +753,7 @@ function upsert(id, cfg){
   S.charts[id] = new Chart(document.getElementById(id), cfg);
   return S.charts[id];
 }
+function isWide(){ return window.matchMedia("(min-width:1400px)").matches; }
 function isTouch(){ return window.matchMedia("(hover:none)").matches; }
 function isNarrow(){ return window.matchMedia("(max-width:639px)").matches; }
 function quant(sorted,q){ const p=(sorted.length-1)*q, lo=Math.floor(p), hi=Math.ceil(p); return sorted[lo]+(sorted[hi]-sorted[lo])*(p-lo); }
@@ -785,6 +825,28 @@ function syncAxis(){
   x.drawImage(c.canvas, 0, 0, ax.width, ax.height, 0, 0, ax.width, ax.height);
   $("#epiBox").classList.toggle("scrolled", scroller.scrollLeft > 2);
 }
+/* Tooltip housekeeping: Chart.js only hides a tooltip on mouse-out of the canvas, so it lingers when the
+   pointer rests on the axis labels or when the page scrolls under a still mouse. Hide it in both cases. */
+function hideTip(chart){
+  if (!chart || !chart.tooltip || !chart.tooltip.getActiveElements().length) return;
+  chart.tooltip.setActiveElements([], {x:0, y:0});
+  chart.setActiveElements([]);
+  chart.update("none");
+}
+const tipGuardPlugin = {
+  id:"tipGuard",
+  afterEvent(chart, args){
+    const e = args.event, a = chart.chartArea;
+    if (e.type==="mouseout" || (a && (e.x < a.left || e.x > a.right || e.y < a.top || e.y > a.bottom))){
+      if (chart.tooltip && chart.tooltip.getActiveElements().length){
+        chart.tooltip.setActiveElements([], {x:0, y:0}); chart.setActiveElements([]); args.changed = true;
+      }
+    }
+  }
+};
+let tipScrollT;
+window.addEventListener("scroll", () => { clearTimeout(tipScrollT); tipScrollT = setTimeout(() => Object.values(S.charts).forEach(hideTip), 0); }, {passive:true});
+document.addEventListener("visibilitychange", () => Object.values(S.charts).forEach(hideTip));
 const stickyAxisPlugin = { id:"stickyAxis", afterRender(){ syncAxis(); } };
 function renderEpiLegend(show){
   const box = $("#epiLegend"), c = S.charts.cEpi;
@@ -949,7 +1011,8 @@ function renderPBar(id, k, title){
 function renderRank(id, k, n){
   const list = filtered(k), c = countBy(list,k), sel = S.filters[k], tot = list.length;
   const vals = orderedValues(k,c);
-  const box = $("#"+id), expanded = box.dataset.expanded==="1";
+  const box = $("#"+id), fit = box.classList.contains("fit") && isWide();
+  const expanded = fit || box.dataset.expanded==="1";
   const named = vals.filter(v=>v!==NA);
   const mx = Math.max(1, ...named.map(v=>c.get(v)));
   const show = expanded ? vals : named.slice(0,n).concat(c.get(NA) ? [NA] : []);
@@ -965,7 +1028,7 @@ function renderRank(id, k, n){
     const li = el("li"); li.append(b); ol.append(li);
   });
   box.append(ol);
-  if (named.length > n){
+  if (named.length > n && !fit){
     const m = el("button",{type:"button",class:"more"}, expanded ? "Show fewer" : `Show all ${vals.length}`);
     m.onclick = () => { box.dataset.expanded = expanded ? "" : "1"; renderRank(id,k,n); if (expanded) box.closest(".card").scrollIntoView({block:"nearest"}); };
     box.append(m);

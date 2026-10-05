@@ -355,7 +355,6 @@ table.thr-tbl td.hi{color:var(--act);font-weight:800}
       <div class="thr-status" id="thrStatus" aria-live="polite">
         <div class="thr-st-head"><span class="thr-st" id="thrSt"></span><span class="thr-when" id="thrWhen"></span></div>
         <p class="thr-text" id="thrText"></p>
-        <p class="thr-note" id="thrNote" hidden></p>
       </div>
       <dl class="thr-facts" id="thrFacts"></dl>
 
@@ -1339,11 +1338,6 @@ function renderThr(){
     }
   }
   $("#thrText").textContent = txt;
-  const note = $("#thrNote"), i = p ? T.idx[p.y+"-"+p.w] : -1, prevObs = i>0 ? T.series[i-1].obs : null;
-  if (p && (p.status==="outbreak"||p.status==="warning")){
-    note.hidden = false;
-    note.textContent = `Before acting, confirm this is not a batch of late notifications entered in one week. The count is ${prevObs ? (p.obs/prevObs).toFixed(1)+" times" : "well above"} the previous week.`;
-  } else note.hidden = true;
   const f = p && p.far;
   const facts = [
     [p?p.obs:"–", p?`cases in week ${p.w}`:"cases", p&&(p.fA||p.fC)],

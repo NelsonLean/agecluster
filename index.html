@@ -208,6 +208,10 @@ table.hm td.nd{color:var(--muted);text-align:center}
 /* Surveillance threshold */
 .thr{--ok:#2F8F7E;--warn:#D08C1A;--act:#B8433A;--c2:#3D6FB6;--chk:#1BA3B8}
 .thr-head{display:flex;align-items:flex-start;gap:10px;justify-content:space-between}
+.thr-mode{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;margin:0 0 12px;font-size:13px;color:var(--muted);font-weight:600}
+.thr-mode .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:2px;background:#fff}
+.thr-mode .seg button{border:0;background:none;border-radius:999px;padding:6px 14px;font-size:13.5px;font-weight:600;color:var(--ink-2);cursor:pointer}
+.thr-mode .seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
 .thr-head select{flex:none;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff;font-size:14px;font-weight:600}
 .thr-status{border-left:6px solid var(--na);background:var(--paper);border-radius:10px;padding:12px 14px;margin:2px 0 12px}
 .thr-status.normal{border-left-color:var(--ok)} .thr-status.warning{border-left-color:var(--warn)} .thr-status.outbreak{border-left-color:var(--act)}
@@ -347,9 +351,16 @@ table.thr-tbl td.hi{color:var(--act);font-weight:800}
       <div class="thr-head">
         <div>
           <h3 id="thrTitle">Surveillance threshold</h3>
-          <div class="cn" id="thrSub">Weekly AGE notifications in Daerah Tawau against the historical and short-term thresholds.</div>
+          <div class="cn" id="thrSub"></div>
         </div>
         <select id="thrYear" aria-label="Year shown"></select>
+      </div>
+      <div class="thr-mode" role="group" aria-label="Historical threshold">
+        <span>Historical threshold</span>
+        <div class="seg">
+          <button type="button" data-flat="1" aria-pressed="true">Flat</button>
+          <button type="button" data-flat="0" aria-pressed="false">Week-specific</button>
+        </div>
       </div>
 
       <div class="thr-status" id="thrStatus" aria-live="polite">
@@ -379,9 +390,11 @@ table.thr-tbl td.hi{color:var(--act);font-weight:800}
       <details class="thr-method">
         <summary>How the thresholds are calculated</summary>
         <div class="thr-notes">
-          <p>Each week is judged against two independent thresholds. The historical threshold asks whether cases are higher than usual for this time of year. The short-term threshold asks whether cases jumped compared with the last few weeks. AGE has weak seasonality and its baseline level shifts between years, so neither threshold is reliable on its own.</p>
-          <h5>Historical threshold (Farrington algorithm, adapted)</h5>
-          <p>For each week, cases from the same week ±3 weeks are taken from the five most recent baseline years, leaving out 2020 and 2021. 2020 carries a pre-MCO reporting pattern and 2021 was suppressed during COVID-19 restrictions. A quasi-Poisson regression is fitted to these counts without a trend term, because Tawau AGE shows year-to-year level shifts rather than a steady trend. Baseline weeks with a standardised Anscombe residual above 1 are down-weighted in proportion to the residual squared, so past outbreaks such as 2024 weeks 23 to 28 do not inflate the threshold. The alert and action lines are the 95% and 99% upper prediction bounds, calculated on the 2/3-power scale to correct for skew in count data.</p>
+          <p>Each week is judged against two independent thresholds. The historical threshold asks whether cases are higher than usual for recent years, either in a typical week (flat) or for this time of year (week-specific). The short-term threshold asks whether cases jumped compared with the last few weeks. AGE has weak seasonality and its baseline level shifts between years, so neither threshold is reliable on its own.</p>
+          <h5>Historical threshold (Farrington algorithm)</h5>
+          <p>Cases are taken from the five most recent baseline years, leaving out 2020 and 2021. 2020 carries a pre-MCO reporting pattern and 2021 was suppressed during COVID-19 restrictions. A quasi-Poisson regression is fitted to these counts without a trend term, because Tawau AGE shows year-to-year level shifts rather than a steady trend. Baseline weeks with a standardised Anscombe residual above 1 are down-weighted in proportion to the residual squared, so past outbreaks such as 2024 weeks 23 to 28 do not inflate the threshold. The alert and action lines are the 95% and 99% upper prediction bounds, calculated on the 2/3-power scale to correct for skew in count data. The shaded band is the usual range (Q1 to Q3) of the same baseline counts.</p>
+          <p><b>Week-specific</b> is the standard Farrington approach. Each week is compared with the same week ±3 weeks of the baseline years, about 35 counts, so the lines rise and fall through the year. With so few counts per week, past outbreaks in the window make the lines bulge, for example around weeks 22 to 28 because of 2024.</p>
+          <p><b>Flat</b> pools every week of the baseline years, about 260 counts, giving one expected, alert and action line for the whole year. A quasi-Poisson model with annual and semi-annual harmonic terms found no significant seasonality in the 2017–2019 and 2022–2025 data (p = 0.11, peak about 1.3 times the trough), which supports a non-seasonal line, and pooling makes it less sensitive to any single past outbreak. This is a non-seasonal adaptation of Farrington rather than a published standard method.</p>
           <h5>Short-term threshold (EARS C2)</h5>
           <p>The mean and standard deviation of the seven weeks from 9 to 3 weeks before the current week are calculated. The two-week gap stops the start of an outbreak from raising its own baseline. The threshold is the mean plus three standard deviations, with the standard deviation floored at 1.</p>
           <h5>Signal rules</h5>
@@ -1238,7 +1251,7 @@ function savePng(){
 }
 
 /* ---------- surveillance threshold (weekly notifications, embedded) ---------- */
-const T = {data:null, excluded:new Set([2020,2021]), b:5, h:3, zA:1.645, zB:2.326, k:3, series:[], idx:{}, year:null, positioned:false};
+const T = {data:null, excluded:new Set([2020,2021]), b:5, h:3, zA:1.645, zB:2.326, k:3, series:[], idx:{}, year:null, positioned:false, flat:true};
 const tMean = a => a.reduce((s,x)=>s+x,0)/a.length;
 const tSd = a => { const m=tMean(a); return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/(a.length-1)); };
 function tQuant(a,q){ const s=[...a].sort((x,y)=>x-y), p=(s.length-1)*q, lo=Math.floor(p), hi=Math.ceil(p); return s[lo]+(s[hi]-s[lo])*(p-lo); }
@@ -1249,7 +1262,13 @@ function tWindow(Y,W){
   const base = T.data.years.filter(y=>y<Y && !T.excluded.has(y)).sort((a,b)=>b-a).slice(0,T.b);
   if (base.length<3) return null;
   const pts=[];
-  base.forEach(by => { for (let d=-T.h; d<=T.h; d++){ const [yy,ww]=tShift(by,W,d); if (yy>=Y || T.excluded.has(yy)) continue; const v=tGet(yy,ww); if (v!=null) pts.push(v); } });
+  if (T.flat){
+    /* flat threshold: pool every week of the baseline years (about 260 counts) */
+    base.forEach(by => { for (let ww=1; ww<=tWeeksIn(by); ww++){ const v=tGet(by,ww); if (v!=null) pts.push(v); } });
+  } else {
+    /* week-specific threshold: the same week ±3 weeks of each baseline year (about 35 counts) */
+    base.forEach(by => { for (let d=-T.h; d<=T.h; d++){ const [yy,ww]=tShift(by,W,d); if (yy>=Y || T.excluded.has(yy)) continue; const v=tGet(yy,ww); if (v!=null) pts.push(v); } });
+  }
   return pts.length>=10 ? pts : null;
 }
 /* quasi-Poisson, intercept only (no trend), fitted by IRLS */
@@ -1263,7 +1282,9 @@ function tFit(y,w){
   const mu=Math.exp(b); let X2=0; for (let i=0;i<y.length;i++) X2+=w[i]*(y[i]-mu)**2/mu;
   return {b, inv:1/a00, mu, phi:Math.max(1, X2/(y.length-1))};
 }
-function tFarrington(Y,W){
+const tFarCache={}, tChCache={};
+function tFarrington(Y,W){ if (!T.flat) return tFarringtonFit(Y,W); if (!(Y in tFarCache)) tFarCache[Y]=tFarringtonFit(Y,W); return tFarCache[Y]; }
+function tFarringtonFit(Y,W){
   const y = tWindow(Y,W); if (!y) return null;
   if (y.reduce((s,x)=>s+x,0)<1) return {exp:0,uA:0,uB:0,down:0};
   let w = y.map(()=>1), m = tFit(y,w);
@@ -1273,9 +1294,10 @@ function tFarrington(Y,W){
   w = w.map(x=>x*g); m = tFit(y,w);
   const mu0=Math.exp(m.b), tau=m.phi*mu0 + mu0*mu0*m.phi*m.inv;
   const U = z => mu0*Math.pow(1+(2/3)*z*Math.sqrt(tau)/mu0, 1.5);
-  return {exp:mu0, uA:U(T.zA), uB:U(T.zB), down};
+  return {exp:mu0, uA:U(T.zA), uB:U(T.zB), down, n:y.length, phi:m.phi};
 }
-function tChannel(Y,W){ const v=tWindow(Y,W); return v ? {q1:tQuant(v,.25), med:tQuant(v,.5), q3:tQuant(v,.75)} : null; }
+function tChannel(Y,W){ if (!T.flat) return tChannelFit(Y,W); if (!(Y in tChCache)) tChCache[Y]=tChannelFit(Y,W); return tChCache[Y]; }
+function tChannelFit(Y,W){ const v=tWindow(Y,W); return v ? {q1:tQuant(v,.25), med:tQuant(v,.5), q3:tQuant(v,.75)} : null; }
 function tC2(s,i){ const b=s.slice(Math.max(0,i-9), Math.max(0,i-2)).map(p=>p.obs).filter(x=>x!=null); return b.length<5 ? null : tMean(b)+T.k*Math.max(tSd(b),1); }
 function tSpike(s,i){
   const p=s[i]; if (p.obs==null || p.obs<20) return false;
@@ -1312,12 +1334,20 @@ function initThreshold(){
   sel.innerHTML = T.data.years.filter(y => tYear(y).some(p=>p.far)).slice().reverse().map(y => `<option value="${y}">${y}</option>`).join("");
   sel.value = T.year;
   sel.onchange = () => { T.year = +sel.value; T.positioned = false; renderThr(); };
+  document.querySelectorAll(".thr-mode .seg button").forEach(b => b.onclick = () => {
+    const flat = b.dataset.flat==="1"; if (flat===T.flat) return;
+    T.flat = flat;
+    document.querySelectorAll(".thr-mode .seg button").forEach(x => x.setAttribute("aria-pressed", String(x===b)));
+    for (const k in tFarCache) delete tFarCache[k]; for (const k in tChCache) delete tChCache[k];
+    thrCompute(); renderThr();
+  });
   $("#thrScroll").addEventListener("scroll", () => $("#thrBox").classList.toggle("scrolled", $("#thrScroll").scrollLeft > 2), {passive:true});
   $("#thrSrc").textContent = `Source: ${T.data.source}, weekly notifications ${T.data.years[0]} to ${T.data.years[T.data.years.length-1]} week ${T.data.lastWeek}. Years left out of the baseline: 2020, 2021.`;
   renderThr();
 }
 function renderThr(){
   if (!T.data) return;
+  $("#thrSub").textContent = `Weekly AGE notifications in Daerah Tawau against ${T.flat ? "a flat historical threshold (one level for the whole year)" : "a week-specific historical threshold (varies by time of year)"} and the short-term threshold.`;
   const pts = tYear(T.year), rep = pts.filter(p=>p.obs!=null), p = rep[rep.length-1];
   // status
   const box = $("#thrStatus"); box.className = "thr-status " + (p ? p.status||"na" : "na");
@@ -1327,7 +1357,7 @@ function renderThr(){
   if (p){
     const f = p.far; txt = `${p.obs} cases were reported in week ${p.w}.`;
     if (f){
-      txt += ` About ${Math.round(f.exp)} would be expected for this time of year.`;
+      txt += ` About ${Math.round(f.exp)} would be expected ${T.flat ? "in a typical week" : "for this time of year"}.`;
       const parts=[];
       if (p.fA) parts.push(`the historical alert threshold (${Math.round(f.uA)})`);
       if (p.fC) parts.push(`the short-term threshold (${Math.round(p.c2)})`);
